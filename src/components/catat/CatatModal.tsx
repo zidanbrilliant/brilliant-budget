@@ -199,12 +199,15 @@ export const CatatModal: React.FC = () => {
         recognition.onresult = (event: any) => {
           const transcript = event.results[0][0].transcript;
           setIsRecording(false);
+          setCustomVoiceInput(transcript);
           triggerVoiceParse(transcript);
         };
 
         recognition.onerror = () => {
           setIsRecording(false);
-          triggerVoiceParse('Makan siang soto 35 ribu pakai GoPay');
+          const el = document.getElementById('custom-voice-input');
+          el?.focus();
+          showToast('Gunakan ikon mic 🎤 di keyboard iPhone untuk dikte suara');
         };
 
         recognition.onend = () => {
@@ -218,11 +221,10 @@ export const CatatModal: React.FC = () => {
       }
     }
 
-    setIsRecording(true);
-    setTimeout(() => {
-      setIsRecording(false);
-      triggerVoiceParse('Makan siang soto 35 ribu pakai GoPay');
-    }, 1200);
+    // iOS WKWebView fallback: Focus input so iPhone keyboard opens with native dictation mic button
+    const el = document.getElementById('custom-voice-input');
+    el?.focus();
+    showToast('Ketuk ikon mic 🎤 pada keyboard iPhone untuk dikte suara');
   };
 
   const handleSaveVoiceItems = (asDraft = false) => {
@@ -712,33 +714,55 @@ export const CatatModal: React.FC = () => {
                 <span className="text-[11px] font-bold text-slate-400 uppercase">
                   Contoh Cepat (1 Ketuk):
                 </span>
-                <div className="grid grid-cols-1 gap-1.5 text-xs">
+                <div className="grid grid-cols-2 gap-1.5 text-xs">
                   <button
+                    type="button"
                     onClick={() => triggerVoiceParse('Makan siang 35 ribu pakai GoPay')}
                     className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-left hover:border-emerald-500 border border-slate-200/60 dark:border-slate-700 flex items-center justify-between transition"
                   >
-                    <span>"Makan siang 35 ribu pakai GoPay"</span>
+                    <span className="truncate pr-1">"Makan siang 35rb GoPay"</span>
                     <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   </button>
                   <button
-                    onClick={() =>
-                      triggerVoiceParse('Beli bensin 50 ribu terus makan siang 30 ribu')
-                    }
+                    type="button"
+                    onClick={() => triggerVoiceParse('Beli bensin 50 ribu terus makan siang 30 ribu')}
                     className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-left hover:border-emerald-500 border border-slate-200/60 dark:border-slate-700 flex items-center justify-between transition"
                   >
-                    <span>"Beli bensin 50 ribu terus makan siang 30 ribu" (Multi)</span>
+                    <span className="truncate pr-1">"Bensin 50rb + makan 30rb"</span>
                     <Layers className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => triggerVoiceParse('Kopi kenangan 25rb bayar tunai')}
+                    className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-left hover:border-emerald-500 border border-slate-200/60 dark:border-slate-700 flex items-center justify-between transition"
+                  >
+                    <span className="truncate pr-1">"Kopi 25rb bayar tunai"</span>
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => triggerVoiceParse('Belanja minimarket 120 ribu pakai BCA')}
+                    className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-left hover:border-emerald-500 border border-slate-200/60 dark:border-slate-700 flex items-center justify-between transition"
+                  >
+                    <span className="truncate pr-1">"Belanja 120rb BCA"</span>
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   </button>
                 </div>
               </div>
 
-              {/* Custom Voice Text Input for iPhone dictation or custom typing */}
+              {/* iPhone Dictation & Custom Voice Input */}
               <div className="text-left space-y-1.5 pt-1">
-                <span className="text-[11px] font-bold text-slate-400 uppercase">
-                  Atau Ketik / Dikte Kalimat Bebas:
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase">
+                    Ketik atau Dikte Suara:
+                  </span>
+                  <span className="text-[10px] text-pink-600 dark:text-pink-400 font-semibold">
+                    💡 Gunakan mic 🎤 di keyboard iPhone
+                  </span>
+                </div>
                 <div className="flex gap-2">
                   <input
+                    id="custom-voice-input"
                     type="text"
                     value={customVoiceInput}
                     onChange={e => setCustomVoiceInput(e.target.value)}
@@ -747,7 +771,7 @@ export const CatatModal: React.FC = () => {
                         triggerVoiceParse(customVoiceInput);
                       }
                     }}
-                    placeholder="Contoh: 'Beli martabak 45rb bayar gopay'"
+                    placeholder="Ketik atau dikte ucapan transaksi di sini..."
                     className="flex-1 px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-base sm:text-xs border border-transparent focus:border-slate-300 dark:focus:border-slate-700"
                   />
                   <button
@@ -850,42 +874,80 @@ export const CatatModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Dropzone with Real Camera & Photo Input */}
+              {/* Hidden Inputs for Real Camera & Photo Library */}
               <input
                 type="file"
                 accept="image/*"
                 capture="environment"
-                id="receipt-file-input"
+                id="receipt-camera-input"
                 className="hidden"
                 onChange={handleImageFileChange}
               />
-              <label
-                htmlFor="receipt-file-input"
-                className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500 rounded-2xl p-4 text-center space-y-2 block cursor-pointer transition active:scale-[0.99]"
-              >
-                {uploadedImageUrl ? (
-                  <div className="space-y-2">
-                    <img
-                      src={uploadedImageUrl}
-                      alt="Pratinjau Nota"
-                      className="max-h-36 mx-auto rounded-xl object-contain border border-slate-200 dark:border-slate-700 shadow-xs"
-                    />
-                    <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                      Foto Nota Terpasang • Ketuk untuk Ganti Foto
-                    </div>
+              <input
+                type="file"
+                accept="image/*"
+                id="receipt-gallery-input"
+                className="hidden"
+                onChange={handleImageFileChange}
+              />
+
+              {uploadedImageUrl ? (
+                <div className={`p-3.5 rounded-2xl border text-center space-y-2 ${isPinkTheme ? 'bg-white border-pink-200' : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200/80 dark:border-slate-700'}`}>
+                  <img
+                    src={uploadedImageUrl}
+                    alt="Pratinjau Nota"
+                    className="max-h-40 mx-auto rounded-xl object-contain border border-slate-200 dark:border-slate-700 shadow-xs"
+                  />
+                  <div className="flex justify-center gap-2 pt-1">
+                    <label
+                      htmlFor="receipt-camera-input"
+                      className={`px-3 py-1.5 rounded-xl font-bold text-xs cursor-pointer flex items-center gap-1 active:scale-95 transition ${
+                        isPinkTheme ? 'bg-pink-100 text-pink-800' : 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200'
+                      }`}
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>Foto Ulang</span>
+                    </label>
+                    <label
+                      htmlFor="receipt-gallery-input"
+                      className={`px-3 py-1.5 rounded-xl font-bold text-xs cursor-pointer flex items-center gap-1 active:scale-95 transition ${
+                        isPinkTheme ? 'bg-pink-100 text-pink-800' : 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200'
+                      }`}
+                    >
+                      <UploadCloud className="w-3.5 h-3.5" />
+                      <span>Pilih Galeri</span>
+                    </label>
                   </div>
-                ) : (
-                  <>
-                    <UploadCloud className="w-7 h-7 mx-auto text-emerald-600 dark:text-emerald-400" />
-                    <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                      Ambil Foto Nota atau Pilih dari Galeri
-                    </div>
-                    <p className="text-[11px] text-slate-400">
-                      Ketuk di sini untuk membuka Kamera iPhone / Album Foto
-                    </p>
-                  </>
-                )}
-              </label>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2.5">
+                  <label
+                    htmlFor="receipt-camera-input"
+                    className={`border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition active:scale-95 flex flex-col items-center justify-center gap-1.5 ${
+                      isPinkTheme ? 'border-pink-200 bg-white hover:border-pink-400' : 'border-slate-300 dark:border-slate-700 hover:border-emerald-500'
+                    }`}
+                  >
+                    <Camera className={`w-6 h-6 ${isPinkTheme ? 'text-rose-500' : 'text-emerald-600'}`} />
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      Ambil Kamera
+                    </span>
+                    <span className="text-[10px] text-slate-400">Foto nota langsung</span>
+                  </label>
+
+                  <label
+                    htmlFor="receipt-gallery-input"
+                    className={`border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition active:scale-95 flex flex-col items-center justify-center gap-1.5 ${
+                      isPinkTheme ? 'border-pink-200 bg-white hover:border-pink-400' : 'border-slate-300 dark:border-slate-700 hover:border-emerald-500'
+                    }`}
+                  >
+                    <UploadCloud className={`w-6 h-6 ${isPinkTheme ? 'text-rose-500' : 'text-emerald-600'}`} />
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      Pilih Galeri
+                    </span>
+                    <span className="text-[10px] text-slate-400">Dari album foto</span>
+                  </label>
+                </div>
+              )}
 
               {/* Editable OCR text area (FR-10: Layar konfirmasi dengan bidang yang dapat diedit) */}
               {ocrEditText && (

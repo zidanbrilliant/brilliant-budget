@@ -85,7 +85,7 @@ app.post('/api/accounts', (req: Request, res: Response) => {
 
 // Rekonsiliasi Saldo Akun (FR-30)
 app.post('/api/accounts/:id/reconcile', (req: Request, res: Response) => {
-  const accountId = req.params.id;
+  const accountId = String(req.params.id);
   const { new_balance, note } = req.body;
   const current = calculateAccountBalance(accountId);
   const diff = Number(new_balance) - current;
@@ -129,6 +129,51 @@ app.post('/api/categories', (req: Request, res: Response) => {
     VALUES (?, ?, ?, ?, ?, 99, ?, ?)
   `).run(id, name, kind, icon, color, now, now);
   res.status(201).json({ id, name, kind, icon, color, sort_order: 99 });
+});
+
+// Update Kategori (FR-35)
+app.put('/api/categories/:id', (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const { name, icon, color, kind } = req.body;
+  const now = Date.now();
+
+  const current = db.prepare('SELECT * FROM category WHERE id = ?').get(id) as any;
+  if (!current) {
+    res.status(404).json({ error: 'Kategori tidak ditemukan' });
+    return;
+  }
+
+  db.prepare(`
+    UPDATE category SET
+      name = COALESCE(?, name),
+      icon = COALESCE(?, icon),
+      color = COALESCE(?, color),
+      kind = COALESCE(?, kind),
+      updated_at = ?
+    WHERE id = ?
+  `).run(name || null, icon || null, color || null, kind || null, now, id);
+
+  const updated = db.prepare('SELECT * FROM category WHERE id = ?').get(id);
+  res.json(updated);
+});
+
+// Hapus Kategori dengan Cascade Reassign ke cat-lainnya
+app.delete('/api/categories/:id', (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  if (id === 'cat-lainnya') {
+    res.status(400).json({ error: 'Kategori sistem tidak dapat dihapus' });
+    return;
+  }
+
+  const now = Date.now();
+  // 1. Reassign transactions to 'cat-lainnya'
+  db.prepare("UPDATE txn SET category_id = 'cat-lainnya', updated_at = ? WHERE category_id = ?").run(now, id);
+  // 2. Remove referencing budget lines
+  db.prepare('DELETE FROM budget_line WHERE category_id = ?').run(id);
+  // 3. Delete category
+  db.prepare('DELETE FROM category WHERE id = ?').run(id);
+
+  res.json({ success: true, id });
 });
 
 // ---------------- TRANSACTIONS ----------------
@@ -216,7 +261,7 @@ app.post('/api/transactions', (req: Request, res: Response) => {
 });
 
 app.put('/api/transactions/:id', (req: Request, res: Response) => {
-  const id = req.params.id;
+  const id = String(req.params.id);
   const updates = req.body;
   const now = Date.now();
 
@@ -252,14 +297,14 @@ app.put('/api/transactions/:id', (req: Request, res: Response) => {
 });
 
 app.delete('/api/transactions/:id', (req: Request, res: Response) => {
-  const id = req.params.id;
+  const id = String(req.params.id);
   db.prepare('DELETE FROM txn WHERE id = ?').run(id);
   res.json({ success: true, id });
 });
 
 // Confirm Draft (FR-25)
 app.post('/api/transactions/:id/confirm', (req: Request, res: Response) => {
-  const id = req.params.id;
+  const id = String(req.params.id);
   db.prepare("UPDATE txn SET status = 'confirmed', updated_at = ? WHERE id = ?").run(Date.now(), id);
   res.json({ success: true, id });
 });
@@ -343,8 +388,9 @@ app.post('/api/recurring', (req: Request, res: Response) => {
 });
 
 app.delete('/api/recurring/:id', (req: Request, res: Response) => {
-  db.prepare('DELETE FROM recurring_rule WHERE id = ?').run(req.params.id);
-  res.json({ success: true, id: req.params.id });
+  const id = String(req.params.id);
+  db.prepare('DELETE FROM recurring_rule WHERE id = ?').run(id);
+  res.json({ success: true, id });
 });
 
 // ---------------- GOALS (FR-46 to FR-48) ----------------
@@ -367,7 +413,7 @@ app.post('/api/goals', (req: Request, res: Response) => {
 });
 
 app.post('/api/goals/:id/contribute', (req: Request, res: Response) => {
-  const id = req.params.id;
+  const id = String(req.params.id);
   const { amount } = req.body;
   db.prepare(`
     UPDATE goal SET saved_amount = saved_amount + ?, updated_at = ? WHERE id = ?

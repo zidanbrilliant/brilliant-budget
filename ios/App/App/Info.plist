@@ -66,5 +66,15 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Brilliant Budget memerlukan akses kamera untuk memindai nota dan struk belanja.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Brilliant Budget memerlukan akses galeri foto untuk memilih screenshot atau bukti pembayaran.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Brilliant Budget menyimpan lampiran foto nota ke galeri foto.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Brilliant Budget memerlukan mikrofon untuk mencatat transaksi melalui suara.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Brilliant Budget mengenali ucapan bahasa Indonesia untuk mengisi transaksi secara otomatis.</string>
 </dict>
 </plist>

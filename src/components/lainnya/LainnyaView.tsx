@@ -18,8 +18,11 @@ import {
   Tag,
   Lock,
   X,
+  Edit2,
+  Trash2,
 } from 'lucide-react';
 import { parseOCRText } from '../../utils/parser';
+import { Category } from '../../types/index.ts';
 
 export const LainnyaView: React.FC = () => {
   const {
@@ -32,6 +35,8 @@ export const LainnyaView: React.FC = () => {
     adjustAccountBalance,
     addAccount,
     addCategory,
+    updateCategory,
+    deleteCategory,
     getMonthSummary,
     settings,
     updateSettings,
@@ -50,7 +55,13 @@ export const LainnyaView: React.FC = () => {
   const [isAddCatOpen, setIsAddCatOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [newCatKind, setNewCatKind] = useState<'expense' | 'income'>('expense');
-  const [newCatColor, setNewCatColor] = useState('#10B981');
+  const [newCatColor, setNewCatColor] = useState('#FB7185');
+
+  // Edit Category Modal
+  const [editingCat, setEditingCat] = useState<Category | null>(null);
+  const [editCatName, setEditCatName] = useState('');
+  const [editCatKind, setEditCatKind] = useState<'expense' | 'income'>('expense');
+  const [editCatColor, setEditCatColor] = useState('#FB7185');
 
   // PDF Print Modal (FR-52)
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
@@ -504,22 +515,54 @@ export const LainnyaView: React.FC = () => {
             {categories.map(c => (
               <div
                 key={c.id}
-                className="p-3 flex items-center justify-between text-xs"
+                className="p-3 flex items-center justify-between text-xs gap-2"
               >
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
                   <div
                     className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0"
                     style={{ backgroundColor: c.color }}
                   >
                     <AppIcon name={c.icon} className="w-3.5 h-3.5 text-white" />
                   </div>
-                  <div>
-                    <span className="font-bold text-slate-900 dark:text-white">{c.name}</span>
+                  <div className="min-w-0">
+                    <span className="font-bold text-slate-900 dark:text-white truncate block">{c.name}</span>
+                    <span className="text-[10px] text-slate-400 capitalize">
+                      {c.kind === 'expense' ? 'Pengeluaran' : 'Pemasukan'}
+                    </span>
                   </div>
                 </div>
-                <span className="text-[10px] text-slate-400 capitalize px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-md">
-                  {c.kind === 'expense' ? 'Pengeluaran' : 'Pemasukan'}
-                </span>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => {
+                      setEditingCat(c);
+                      setEditCatName(c.name);
+                      setEditCatKind(c.kind);
+                      setEditCatColor(c.color);
+                    }}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                    title="Ubah Kategori"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  {c.id !== 'cat-lainnya' && (
+                    <button
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `Hapus kategori "${c.name}"? Transaksi yang menggunakan kategori ini akan dialihkan ke "Lainnya".`
+                          )
+                        ) {
+                          deleteCategory(c.id);
+                        }
+                      }}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                      title="Hapus Kategori"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -889,7 +932,7 @@ export const LainnyaView: React.FC = () => {
               <div>
                 <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Pilih Warna</label>
                 <div className="flex gap-2">
-                  {['#059669', '#1E293B', '#334155', '#475569', '#64748B'].map(color => (
+                  {['#FB7185', '#F472B6', '#FDA4AF', '#FB923C', '#C084FC', '#10B981'].map(color => (
                     <button
                       key={color}
                       type="button"
@@ -917,7 +960,7 @@ export const LainnyaView: React.FC = () => {
                   addCategory({
                     name: newCatName.trim(),
                     kind: newCatKind,
-                    icon: 'Tag',
+                    icon: newCatKind === 'expense' ? 'Heart' : 'Gift',
                     color: newCatColor,
                   });
                   setNewCatName('');
@@ -926,6 +969,102 @@ export const LainnyaView: React.FC = () => {
                 className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold"
               >
                 Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Edit Kategori */}
+      {editingCat && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#151E2E] rounded-2xl p-5 max-w-sm w-full space-y-3.5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                Ubah Kategori
+              </h3>
+              <button onClick={() => setEditingCat(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5 text-xs">
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nama Kategori</label>
+                <input
+                  type="text"
+                  value={editCatName}
+                  onChange={e => setEditCatName(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Jenis Kategori</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditCatKind('expense')}
+                    className={`flex-1 py-2 rounded-xl font-bold transition ${
+                      editCatKind === 'expense'
+                        ? 'bg-rose-500 text-white'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                    }`}
+                  >
+                    Pengeluaran
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditCatKind('income')}
+                    className={`flex-1 py-2 rounded-xl font-bold transition ${
+                      editCatKind === 'income'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                    }`}
+                  >
+                    Pemasukan
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Pilih Warna</label>
+                <div className="flex gap-2">
+                  {['#FB7185', '#F472B6', '#FDA4AF', '#FB923C', '#C084FC', '#10B981'].map(color => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setEditCatColor(color)}
+                      className={`w-7 h-7 rounded-full transition-transform ${
+                        editCatColor === color ? 'scale-125 ring-2 ring-slate-400' : ''
+                      }`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setEditingCat(null)}
+                className="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => {
+                  if (!editCatName.trim()) return;
+                  updateCategory(editingCat.id, {
+                    name: editCatName.trim(),
+                    kind: editCatKind,
+                    color: editCatColor,
+                  });
+                  setEditingCat(null);
+                }}
+                className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold"
+              >
+                Simpan Perubahan
               </button>
             </div>
           </div>

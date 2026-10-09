@@ -51,6 +51,23 @@ export const api = {
     return res.json();
   },
 
+  async updateCategory(id: string, updates: Partial<Category>): Promise<Category> {
+    const res = await fetch(`${BASE_URL}/categories/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Gagal mengubah kategori');
+    return res.json();
+  },
+
+  async deleteCategory(id: string): Promise<void> {
+    const res = await fetch(`${BASE_URL}/categories/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Gagal menghapus kategori');
+  },
+
   async getTransactions(status?: string): Promise<Txn[]> {
     const url = status ? `${BASE_URL}/transactions?status=${status}` : `${BASE_URL}/transactions`;
     const res = await fetch(url);

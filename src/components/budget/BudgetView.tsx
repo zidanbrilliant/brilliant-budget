@@ -7,13 +7,18 @@ import {
   Plus,
   Repeat,
   Percent,
+  X,
+  Trash2,
+  Edit2,
+  Check,
 } from 'lucide-react';
-import { BudgetMethod } from '../../types/index.ts';
+import { BudgetMethod, BudgetLine } from '../../types/index.ts';
 
 export const BudgetView: React.FC = () => {
   const {
     budget,
     updateBudget,
+    updateBudgetLine,
     categories,
     accounts,
     getMonthSummary,
@@ -32,6 +37,15 @@ export const BudgetView: React.FC = () => {
   const [isEditingBudgetModal, setIsEditingBudgetModal] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<BudgetMethod>(budget.method);
   const [totalLimitInput, setTotalLimitInput] = useState<number>(budget.total_limit);
+
+  // Per-category budget customization map inside the modal
+  const [customCategoryAmounts, setCustomCategoryAmounts] = useState<Record<string, number>>({});
+  const [customCategoryRollover, setCustomCategoryRollover] = useState<Record<string, boolean>>({});
+
+  // Single line quick-edit modal
+  const [editingLineCatId, setEditingLineCatId] = useState<string | null>(null);
+  const [editingLineAmount, setEditingLineAmount] = useState<number>(0);
+  const [editingLineRollover, setEditingLineRollover] = useState<boolean>(false);
 
   // New Goal modal state
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
@@ -58,13 +72,76 @@ export const BudgetView: React.FC = () => {
   const monthlySubCost = subscriptions.reduce((sum, r) => sum + r.amount, 0);
   const annualSubCost = monthlySubCost * 12;
 
+  const expenseCategories = categories.filter(c => c.kind === 'expense');
+
+  const openEditBudgetModal = () => {
+    setSelectedMethod(budget.method);
+    setTotalLimitInput(budget.total_limit);
+
+    // Initialize custom category amounts map
+    const amounts: Record<string, number> = {};
+    const rollovers: Record<string, boolean> = {};
+    expenseCategories.forEach(c => {
+      const existingLine = budget.lines.find(l => l.category_id === c.id);
+      amounts[c.id] = existingLine ? existingLine.amount : 0;
+      rollovers[c.id] = existingLine ? Boolean(existingLine.rollover) : false;
+    });
+    setCustomCategoryAmounts(amounts);
+    setCustomCategoryRollover(rollovers);
+    setIsEditingBudgetModal(true);
+  };
+
   const handleSaveBudget = () => {
+    const isCategoryBased = selectedMethod === 'category' || selectedMethod === 'envelope';
+
+    if (isCategoryBased) {
+      const newLines: BudgetLine[] = [];
+      let computedTotal = 0;
+
+      expenseCategories.forEach(c => {
+        const amt = Math.max(0, customCategoryAmounts[c.id] || 0);
+        if (amt > 0) {
+          computedTotal += amt;
+          newLines.push({
+            id: 'b-line-' + c.id,
+            category_id: c.id,
+            name: c.name,
+            amount: amt,
+            rollover: customCategoryRollover[c.id] || false,
+          });
+        }
+      });
+
+      updateBudget({
+        ...budget,
+        method: selectedMethod,
+        total_limit: computedTotal,
+        lines: newLines,
+      });
+    } else {
+      updateBudget({
+        ...budget,
+        method: selectedMethod,
+        total_limit: Math.max(0, totalLimitInput),
+      });
+    }
+
+    setIsEditingBudgetModal(false);
+  };
+
+  const handleSaveQuickLine = () => {
+    if (!editingLineCatId) return;
+    updateBudgetLine(editingLineCatId, editingLineAmount, editingLineRollover);
+    setEditingLineCatId(null);
+  };
+
+  const handleRemoveLine = (catId: string) => {
+    const updatedLines = budget.lines.filter(l => l.category_id !== catId);
     updateBudget({
       ...budget,
-      method: selectedMethod,
-      total_limit: totalLimitInput,
+      lines: updatedLines,
     });
-    setIsEditingBudgetModal(false);
+    setEditingLineCatId(null);
   };
 
   const handleCreateGoal = () => {
@@ -113,7 +190,7 @@ export const BudgetView: React.FC = () => {
           </p>
         </div>
         <button
-          onClick={() => setIsEditingBudgetModal(true)}
+          onClick={openEditBudgetModal}
           className={`text-xs font-bold px-3 py-1.5 rounded-xl border shadow-2xs transition active:scale-95 ${isPinkTheme ? 'bg-white border-pink-200 text-pink-900 hover:border-pink-400' : 'bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200/80 dark:border-slate-700'}`}
         >
           Atur Budget
@@ -253,52 +330,94 @@ export const BudgetView: React.FC = () => {
 
           {/* Rincian Kategori (Grouped Inset List) */}
           <div className="space-y-1.5">
-            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
-              Rincian per Kategori
-            </h3>
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Rincian per Kategori
+              </h3>
+              <button
+                onClick={openEditBudgetModal}
+                className={`text-[11px] font-semibold ${isPinkTheme ? 'text-rose-600' : 'text-emerald-600 dark:text-emerald-400'} hover:underline`}
+              >
+                + Kelola Kategori
+              </button>
+            </div>
 
             <div className="bg-white dark:bg-[#151E2E] rounded-2xl divide-y divide-slate-100 dark:divide-slate-800/80 border border-slate-200/80 dark:border-slate-800/80 shadow-xs overflow-hidden">
-              {budget.lines.map(line => {
-                const cat = categories.find(c => c.id === line.category_id);
-                const spent = line.category_id ? getCategorySpending(line.category_id) : 0;
-                const percent = line.amount > 0 ? Math.min(100, Math.round((spent / line.amount) * 100)) : 0;
-                const isOver = line.amount > 0 && spent > line.amount;
-                const isNear = line.amount > 0 && percent >= 80 && !isOver;
+              {budget.lines.length === 0 ? (
+                <div className="py-8 px-4 text-center space-y-2">
+                  <p className={`text-xs font-bold ${isPinkTheme ? 'text-pink-900' : 'text-slate-700 dark:text-slate-300'}`}>
+                    Belum ada anggaran per kategori yang diatur
+                  </p>
+                  <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                    Tentukan anggaran berbeda untuk setiap kategori pengeluaran Anda.
+                  </p>
+                  <button
+                    onClick={openEditBudgetModal}
+                    className={`mt-1 px-3 py-1.5 rounded-xl text-xs font-bold transition active:scale-95 shadow-xs ${
+                      isPinkTheme ? 'bg-rose-500 text-white hover:bg-rose-600' : 'bg-emerald-600 text-white hover:bg-emerald-500'
+                    }`}
+                  >
+                    + Atur Anggaran Kategori
+                  </button>
+                </div>
+              ) : (
+                budget.lines.map(line => {
+                  const cat = categories.find(c => c.id === line.category_id);
+                  const spent = line.category_id ? getCategorySpending(line.category_id) : 0;
+                  const percent = line.amount > 0 ? Math.min(100, Math.round((spent / line.amount) * 100)) : 0;
+                  const isOver = line.amount > 0 && spent > line.amount;
+                  const isNear = line.amount > 0 && percent >= 80 && !isOver;
 
-                return (
-                  <div key={line.id} className="p-3.5 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <div
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs shadow-2xs"
-                          style={{ backgroundColor: cat?.color || '#6B7280' }}
-                        >
-                          <AppIcon name={cat?.icon || 'CircleEllipsis'} className="w-3.5 h-3.5 text-white" />
+                  return (
+                    <div
+                      key={line.id}
+                      onClick={() => {
+                        setEditingLineCatId(line.category_id || null);
+                        setEditingLineAmount(line.amount);
+                        setEditingLineRollover(Boolean(line.rollover));
+                      }}
+                      className="p-3.5 space-y-2 cursor-pointer hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition active:scale-[0.99] group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs shadow-2xs"
+                            style={{ backgroundColor: cat?.color || '#6B7280' }}
+                          >
+                            <AppIcon name={cat?.icon || 'CircleEllipsis'} className="w-3.5 h-3.5 text-white" />
+                          </div>
+                          <div>
+                            <span className="text-xs font-bold text-slate-800 dark:text-slate-100 block">
+                              {line.name || cat?.name}
+                            </span>
+                            {line.rollover && (
+                              <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                                Rollover Aktif
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                          {line.name || cat?.name}
-                        </span>
+
+                        <div className="text-right text-xs">
+                          <span className="font-bold tabular-nums text-slate-900 dark:text-white">
+                            {formatIDR(spent)}
+                          </span>
+                          <span className="text-slate-400 tabular-nums"> / {formatCompactIDR(line.amount)}</span>
+                        </div>
                       </div>
 
-                      <div className="text-right text-xs">
-                        <span className="font-bold tabular-nums text-slate-900 dark:text-white">
-                          {formatIDR(spent)}
-                        </span>
-                        <span className="text-slate-400 tabular-nums"> / {formatCompactIDR(line.amount)}</span>
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${
+                            isOver ? 'bg-rose-500' : isNear ? 'bg-amber-400' : isPinkTheme ? 'bg-rose-500' : 'bg-emerald-500'
+                          }`}
+                          style={{ width: `${percent}%` }}
+                        ></div>
                       </div>
                     </div>
-
-                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${
-                          isOver ? 'bg-rose-500' : isNear ? 'bg-amber-400' : 'bg-emerald-500'
-                        }`}
-                        style={{ width: `${percent}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
@@ -526,17 +645,65 @@ export const BudgetView: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">
-                  Batas Bulanan (Rp)
-                </label>
-                <input
-                  type="number"
-                  value={totalLimitInput}
-                  onChange={e => setTotalLimitInput(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm font-bold outline-none tabular-nums"
-                />
-              </div>
+              {/* Custom Category Amounts (when category or envelope method) */}
+              {selectedMethod === 'category' || selectedMethod === 'envelope' ? (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className={`text-[11px] font-bold uppercase ${isPinkTheme ? 'text-pink-600/80' : 'text-slate-400'}`}>
+                      Batas Tiap Kategori (Dapat Berbeda-beda)
+                    </label>
+                    <span className={`text-[10px] font-bold tabular-nums ${isPinkTheme ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      Total: {formatIDR(expenseCategories.reduce((sum, c) => sum + Math.max(0, customCategoryAmounts[c.id] || 0), 0))}
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1 scrollbar-none">
+                    {expenseCategories.map(c => (
+                      <div
+                        key={c.id}
+                        className={`p-2 rounded-xl border flex items-center justify-between gap-2 ${isPinkTheme ? 'bg-pink-50/60 border-pink-100' : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200/60 dark:border-slate-700/60'}`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div
+                            className="w-6 h-6 rounded-lg flex items-center justify-center text-white shrink-0 text-xs"
+                            style={{ backgroundColor: c.color }}
+                          >
+                            <AppIcon name={c.icon} className="w-3.5 h-3.5 text-white" />
+                          </div>
+                          <span className={`font-semibold text-xs truncate ${isPinkTheme ? 'text-pink-900' : 'text-slate-800 dark:text-slate-200'}`}>
+                            {c.name}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 w-28 shrink-0">
+                          <span className="text-[10px] text-slate-400">Rp</span>
+                          <input
+                            type="number"
+                            value={customCategoryAmounts[c.id] || 0}
+                            onChange={e =>
+                              setCustomCategoryAmounts({
+                                ...customCategoryAmounts,
+                                [c.id]: Number(e.target.value),
+                              })
+                            }
+                            className={`w-full px-2 py-1 rounded-lg text-right font-bold text-xs outline-none tabular-nums ${isPinkTheme ? 'bg-white text-rose-600 border border-pink-200' : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white'}`}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">
+                    Batas Bulanan (Rp)
+                  </label>
+                  <input
+                    type="number"
+                    value={totalLimitInput}
+                    onChange={e => setTotalLimitInput(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm font-bold outline-none tabular-nums"
+                  />
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2 pt-1">
@@ -548,9 +715,81 @@ export const BudgetView: React.FC = () => {
               </button>
               <button
                 onClick={handleSaveBudget}
-                className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500"
+                className={`flex-1 py-2 rounded-xl text-white text-xs font-bold transition ${isPinkTheme ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-600 hover:bg-emerald-500'}`}
               >
                 Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Edit Single Category Line Modal */}
+      {editingLineCatId && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#151E2E] rounded-2xl p-5 max-w-sm w-full space-y-3.5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                Sesuaikan Anggaran Kategori
+              </h3>
+              <button onClick={() => setEditingLineCatId(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className={`p-3 rounded-xl flex items-center gap-2.5 ${isPinkTheme ? 'bg-pink-50' : 'bg-slate-50 dark:bg-slate-800/60'}`}>
+                <div
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-white"
+                  style={{ backgroundColor: categories.find(c => c.id === editingLineCatId)?.color || '#FB7185' }}
+                >
+                  <AppIcon name={categories.find(c => c.id === editingLineCatId)?.icon || 'Heart'} className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <div className={`font-bold ${isPinkTheme ? 'text-pink-900' : 'text-slate-900 dark:text-white'}`}>
+                    {categories.find(c => c.id === editingLineCatId)?.name}
+                  </div>
+                  <div className="text-[10px] text-slate-400">Atur batas pengeluaran khusus kategori ini</div>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">
+                  Nominal Anggaran Bulanan (Rp)
+                </label>
+                <input
+                  type="number"
+                  value={editingLineAmount}
+                  onChange={e => setEditingLineAmount(Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-base font-bold outline-none tabular-nums"
+                />
+              </div>
+
+              <label className={`flex items-center gap-2 cursor-pointer p-2.5 rounded-xl border ${isPinkTheme ? 'bg-pink-50/50 border-pink-200' : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700'}`}>
+                <input
+                  type="checkbox"
+                  checked={editingLineRollover}
+                  onChange={e => setEditingLineRollover(e.target.checked)}
+                  className="rounded text-rose-500 w-4 h-4"
+                />
+                <span className="font-medium text-slate-700 dark:text-slate-300 text-xs">
+                  Rollover sisa anggaran ke bulan berikutnya
+                </span>
+              </label>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => handleRemoveLine(editingLineCatId)}
+                className="px-3 py-2 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 transition"
+              >
+                Hapus
+              </button>
+              <button
+                onClick={handleSaveQuickLine}
+                className={`flex-1 py-2 rounded-xl text-white text-xs font-bold transition shadow-xs ${isPinkTheme ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-600 hover:bg-emerald-500'}`}
+              >
+                Simpan Nominal
               </button>
             </div>
           </div>

@@ -12,7 +12,8 @@
     "test:parser": "node tests/parser-check.js",
     "test:server": "node tests/backend-test.js",
     "test:golden": "node tests/golden-dataset.test.js",
-    "test": "node tests/parser-check.js && node tests/backend-test.js && node tests/golden-dataset.test.js",
+    "test:budget": "node tests/budget-logic.test.js",
+    "test": "node tests/parser-check.js && node tests/backend-test.js && node tests/golden-dataset.test.js && node tests/budget-logic.test.js",
     "ios:sync": "npm run build && npx cap sync ios",
     "ios:open": "npx cap open ios",
     "icons:generate": "node scripts/generate-icons.js"

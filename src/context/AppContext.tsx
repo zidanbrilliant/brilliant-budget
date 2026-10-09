@@ -19,6 +19,11 @@ import {
   INITIAL_SETTINGS,
 } from '../utils/mockData';
 import { api } from '../services/api';
+import {
+  calculateTotalLimitFromLines,
+  cascadeDeleteCategory,
+  SYSTEM_CATEGORY_ID,
+} from '../utils/budgetLogic.ts';
 
 const STORAGE_KEY = 'CATAT_APP_STATE_V4';
 
@@ -66,8 +71,11 @@ interface AppContextType {
   updateAccount: (id: string, updates: Partial<Account>) => void;
   adjustAccountBalance: (id: string, newBalance: number, note?: string) => void;
   addCategory: (cat: Omit<Category, 'id' | 'sort_order'>) => void;
+  updateCategory: (id: string, updates: Partial<Category>) => void;
+  deleteCategory: (id: string) => void;
 
   updateBudget: (budget: BudgetPlan) => void;
+  updateBudgetLine: (categoryId: string, amount: number, rollover?: boolean) => void;
   addRecurring: (rule: Omit<RecurringRule, 'id'>) => void;
   updateRecurring: (id: string, updates: Partial<RecurringRule>) => void;
   deleteRecurring: (id: string) => void;
@@ -444,6 +452,90 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`Kategori ${newCat.name} dibuat`);
   };
 
+  const updateCategory = (id: string, updates: Partial<Category>) => {
+    setCategories(prev =>
+      prev.map(c => (c.id === id ? { ...c, ...updates, updated_at: Date.now() } : c))
+    );
+    if (isBackendConnected) {
+      api.updateCategory(id, updates).catch(console.error);
+    }
+    showToast('Kategori diperbarui');
+  };
+
+  const deleteCategory = (id: string) => {
+    const result = cascadeDeleteCategory(categories, id, transactions, budget.lines);
+    if (!result.success) {
+      showToast(result.error || 'Gagal menghapus kategori');
+      return;
+    }
+
+    setCategories(result.updatedCategories);
+    setTransactions(result.updatedTransactions);
+
+    const nextLines = result.updatedBudgetLines;
+    const nextTotal =
+      budget.method === 'category' || budget.method === 'envelope'
+        ? calculateTotalLimitFromLines(nextLines)
+        : budget.total_limit;
+
+    const nextBudget: BudgetPlan = {
+      ...budget,
+      lines: nextLines,
+      total_limit: nextTotal,
+    };
+    setBudget(nextBudget);
+
+    if (isBackendConnected) {
+      api.deleteCategory(id).catch(console.error);
+      api.saveBudget(nextBudget).catch(console.error);
+    }
+
+    const note =
+      result.reassignedTxnCount > 0
+        ? `Kategori dihapus (${result.reassignedTxnCount} transaksi dialihkan ke Lainnya)`
+        : 'Kategori dihapus';
+    showToast(note);
+  };
+
+  const updateBudgetLine = (categoryId: string, amount: number, rollover?: boolean) => {
+    const cat = categories.find(c => c.id === categoryId);
+    let lineExists = false;
+    const updatedLines = budget.lines.map(line => {
+      if (line.category_id === categoryId) {
+        lineExists = true;
+        return {
+          ...line,
+          amount: Math.max(0, amount),
+          rollover: rollover !== undefined ? rollover : line.rollover,
+        };
+      }
+      return line;
+    });
+
+    if (!lineExists && cat) {
+      updatedLines.push({
+        id: 'b-line-' + Date.now(),
+        category_id: categoryId,
+        name: cat.name,
+        amount: Math.max(0, amount),
+        rollover: rollover || false,
+      });
+    }
+
+    const nextTotal =
+      budget.method === 'category' || budget.method === 'envelope'
+        ? calculateTotalLimitFromLines(updatedLines)
+        : budget.total_limit;
+
+    const nextBudget: BudgetPlan = {
+      ...budget,
+      lines: updatedLines,
+      total_limit: nextTotal,
+    };
+
+    updateBudget(nextBudget);
+  };
+
   const updateAccount = (id: string, updates: Partial<Account>) => {
     setAccounts(prev =>
       prev.map(a => (a.id === id ? { ...a, ...updates, updated_at: Date.now() } : a))
@@ -476,9 +568,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Budget actions
   const updateBudget = (newBudget: BudgetPlan) => {
-    setBudget(newBudget);
+    const adjustedBudget: BudgetPlan = {
+      ...newBudget,
+      total_limit:
+        newBudget.method === 'category' || newBudget.method === 'envelope'
+          ? calculateTotalLimitFromLines(newBudget.lines)
+          : newBudget.total_limit,
+    };
+    setBudget(adjustedBudget);
     if (isBackendConnected) {
-      api.saveBudget(newBudget).catch(console.error);
+      api.saveBudget(adjustedBudget).catch(console.error);
     }
     showToast('Pengaturan budget diperbarui');
   };
@@ -628,7 +727,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateAccount,
         adjustAccountBalance,
         addCategory,
+        updateCategory,
+        deleteCategory,
         updateBudget,
+        updateBudgetLine,
         addRecurring,
         updateRecurring,
         deleteRecurring,
