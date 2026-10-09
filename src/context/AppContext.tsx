@@ -20,7 +20,7 @@ import {
 } from '../utils/mockData';
 import { api } from '../services/api';
 
-const STORAGE_KEY = 'CATAT_APP_STATE_V3';
+const STORAGE_KEY = 'CATAT_APP_STATE_V4';
 
 interface ToastAction {
   message: string;
@@ -217,8 +217,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(STORAGE_KEY + '_settings', JSON.stringify(settings));
     if (settings.theme === 'dark') {
       document.documentElement.classList.add('dark');
-    } else {
+      document.documentElement.classList.remove('theme-light');
+      document.documentElement.classList.remove('theme-pink');
+    } else if (settings.theme === 'light') {
       document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('theme-light');
+      document.documentElement.classList.remove('theme-pink');
+    } else {
+      // Default: Soft Pink Cute
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.remove('theme-light');
+      document.documentElement.classList.add('theme-pink');
     }
   }, [settings]);
 

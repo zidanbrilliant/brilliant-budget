@@ -27,6 +27,34 @@
   }
 }
 
+/* Theme Classes */
+:root {
+  --app-bg: #fff5f7;
+  --app-card: #ffffff;
+  --app-border: #fce7f3;
+  --app-text: #37131d;
+  --app-muted: #884b5c;
+  --app-accent: #f43f5e;
+}
+
+html.theme-light {
+  --app-bg: #f8fafc;
+  --app-card: #ffffff;
+  --app-border: #e2e8f0;
+  --app-text: #0f172a;
+  --app-muted: #64748b;
+  --app-accent: #059669;
+}
+
+html.dark {
+  --app-bg: #090e17;
+  --app-card: #151e2e;
+  --app-border: #1e293b;
+  --app-text: #f8fafc;
+  --app-muted: #94a3b8;
+  --app-accent: #f43f5e;
+}
+
 /* iOS WebKit: Prevent automatic viewport zoom on input focus */
 @media screen and (max-width: 768px) {
   input, select, textarea {
@@ -61,7 +89,6 @@ html, body {
   }
   to {
     transform: scale(1);
-    opacity: 1;
   }
 }
 

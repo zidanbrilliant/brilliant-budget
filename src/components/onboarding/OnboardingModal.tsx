@@ -13,6 +13,8 @@ export const OnboardingModal: React.FC = () => {
   const { settings, updateSettings } = useApp();
   const [step, setStep] = useState(1);
 
+  const isPinkTheme = settings.theme === 'pink';
+
   if (settings.onboarding_completed) return null;
 
   const handleFinish = () => {
@@ -28,7 +30,7 @@ export const OnboardingModal: React.FC = () => {
             <div
               key={s}
               className={`h-1 rounded-full transition-all duration-300 ${
-                step === s ? 'w-6 bg-emerald-600' : 'w-2 bg-slate-200 dark:bg-slate-700'
+                step === s ? (isPinkTheme ? 'w-6 bg-rose-500' : 'w-6 bg-emerald-600') : (isPinkTheme ? 'w-2 bg-pink-200' : 'w-2 bg-slate-200 dark:bg-slate-700')
               }`}
             ></div>
           ))}
@@ -103,7 +105,7 @@ export const OnboardingModal: React.FC = () => {
           {step < 4 ? (
             <button
               onClick={() => setStep(s => s + 1)}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition active:scale-95"
+              className={`w-full py-2.5 ${isPinkTheme ? 'bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 shadow-rose-300/40' : 'bg-emerald-600 hover:bg-emerald-500 shadow-xs'} text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition active:scale-95`}
             >
               <span>Lanjut</span>
               <ArrowRight className="w-4 h-4" />
@@ -111,10 +113,10 @@ export const OnboardingModal: React.FC = () => {
           ) : (
             <button
               onClick={handleFinish}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-xs transition active:scale-95"
+              className={`w-full py-2.5 ${isPinkTheme ? 'bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 shadow-rose-300/40' : 'bg-emerald-600 hover:bg-emerald-500 shadow-xs'} text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition active:scale-95`}
             >
               <CheckCircle className="w-4 h-4" />
-              <span>Mulai Mencatat</span>
+              <span>Mulai Mencatat 🌸</span>
             </button>
           )}
         </div>

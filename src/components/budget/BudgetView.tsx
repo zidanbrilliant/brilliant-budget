@@ -23,7 +23,10 @@ export const BudgetView: React.FC = () => {
     goals,
     contributeToGoal,
     addGoal,
+    settings,
   } = useApp();
+
+  const isPinkTheme = settings.theme === 'pink';
 
   const [activeTab, setActiveTab] = useState<'budget' | 'recurring' | 'goals'>('budget');
   const [isEditingBudgetModal, setIsEditingBudgetModal] = useState(false);
@@ -102,8 +105,8 @@ export const BudgetView: React.FC = () => {
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-            Budget & Perencanaan
+          <h1 className={`text-xl font-bold tracking-tight ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
+            {isPinkTheme ? 'Budget & Impian 🌸' : 'Budget & Perencanaan'}
           </h1>
           <p className="text-xs text-slate-400">
             Metode: {budget.method === 'category' ? 'Per Kategori' : budget.method === 'percent' ? '50/30/20' : budget.method === 'envelope' ? 'Amplop' : 'Total Bulanan'}
@@ -111,20 +114,20 @@ export const BudgetView: React.FC = () => {
         </div>
         <button
           onClick={() => setIsEditingBudgetModal(true)}
-          className="text-xs font-bold px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl border border-slate-200/80 dark:border-slate-700 shadow-2xs transition active:scale-95"
+          className={`text-xs font-bold px-3 py-1.5 rounded-xl border shadow-2xs transition active:scale-95 ${isPinkTheme ? 'bg-white border-pink-200 text-pink-900 hover:border-pink-400' : 'bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200/80 dark:border-slate-700'}`}
         >
           Atur Budget
         </button>
       </div>
 
       {/* iOS Segmented Tabs */}
-      <div className="grid grid-cols-3 gap-1 bg-slate-200/60 dark:bg-slate-800/80 p-0.5 rounded-xl text-xs font-medium">
+      <div className={`grid grid-cols-3 gap-1 p-0.5 rounded-xl text-xs font-medium ${isPinkTheme ? 'bg-pink-100/70' : 'bg-slate-200/60 dark:bg-slate-800/80'}`}>
         <button
           onClick={() => setActiveTab('budget')}
           className={`py-1.5 rounded-lg transition text-center ${
             activeTab === 'budget'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-bold shadow-2xs'
-              : 'text-slate-500 hover:text-slate-800'
+              ? isPinkTheme ? 'bg-white text-rose-600 font-bold shadow-2xs' : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-bold shadow-2xs'
+              : isPinkTheme ? 'text-pink-600/70 hover:text-pink-900' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           Budget Bulanan
@@ -133,8 +136,8 @@ export const BudgetView: React.FC = () => {
           onClick={() => setActiveTab('recurring')}
           className={`py-1.5 rounded-lg transition text-center ${
             activeTab === 'recurring'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-bold shadow-2xs'
-              : 'text-slate-500 hover:text-slate-800'
+              ? isPinkTheme ? 'bg-white text-rose-600 font-bold shadow-2xs' : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-bold shadow-2xs'
+              : isPinkTheme ? 'text-pink-600/70 hover:text-pink-900' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           Langganan
@@ -143,8 +146,8 @@ export const BudgetView: React.FC = () => {
           onClick={() => setActiveTab('goals')}
           className={`py-1.5 rounded-lg transition text-center ${
             activeTab === 'goals'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-bold shadow-2xs'
-              : 'text-slate-500 hover:text-slate-800'
+              ? isPinkTheme ? 'bg-white text-rose-600 font-bold shadow-2xs' : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-bold shadow-2xs'
+              : isPinkTheme ? 'text-pink-600/70 hover:text-pink-900' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           Target Tabungan

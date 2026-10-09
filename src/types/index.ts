@@ -125,7 +125,7 @@ export interface Goal {
 export interface AppSettings {
   currency: string;
   start_day: number;
-  theme: 'light' | 'dark';
+  theme: 'pink' | 'light' | 'dark';
   pin_enabled: boolean;
   pin_code?: string;
   biometrics_enabled: boolean;

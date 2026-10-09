@@ -19,7 +19,10 @@ export const TransaksiView: React.FC = () => {
     deleteTransaction,
     updateTransaction,
     openCatat,
+    settings,
   } = useApp();
+
+  const isPinkTheme = settings.theme === 'pink';
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | TxnType>('all');
@@ -97,8 +100,8 @@ export const TransaksiView: React.FC = () => {
       {/* Title & Add button */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
-            Riwayat Transaksi
+          <h1 className={`text-xl font-bold tracking-tight ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
+            {isPinkTheme ? 'Riwayat Transaksi ✨' : 'Riwayat Transaksi'}
           </h1>
           <p className="text-xs text-slate-400">
             {filteredTxns.length} transaksi tercatat
@@ -106,7 +109,7 @@ export const TransaksiView: React.FC = () => {
         </div>
         <button
           onClick={() => openCatat('manual')}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold shadow-xs transition active:scale-95"
+          className={`flex items-center gap-1.5 px-3 py-1.5 ${isPinkTheme ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-200' : 'bg-emerald-600 hover:bg-emerald-500'} text-white rounded-xl text-xs font-semibold shadow-xs transition active:scale-95`}
         >
           <Plus className="w-4 h-4 stroke-[2.5]" />
           <span>Tambah</span>
@@ -121,7 +124,7 @@ export const TransaksiView: React.FC = () => {
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           placeholder="Cari transaksi, toko, nominal..."
-          className="w-full pl-9 pr-8 py-2 bg-slate-200/50 dark:bg-slate-800/80 rounded-xl text-base sm:text-xs border border-transparent focus:border-slate-300 dark:focus:border-slate-700 outline-none placeholder:text-slate-400 text-slate-800 dark:text-slate-100 transition"
+          className={`w-full pl-9 pr-8 py-2 rounded-xl text-base sm:text-xs border outline-none placeholder:text-slate-400 transition ${isPinkTheme ? 'bg-white border-pink-200 text-[#37131D] focus:border-pink-400' : 'bg-slate-200/50 dark:bg-slate-800/80 border-transparent focus:border-slate-300 dark:focus:border-slate-700 text-slate-800 dark:text-slate-100'}`}
         />
         {searchQuery && (
           <button
@@ -134,13 +137,13 @@ export const TransaksiView: React.FC = () => {
       </div>
 
       {/* iOS Segmented Filter Controls */}
-      <div className="grid grid-cols-4 gap-1 p-0.5 bg-slate-200/60 dark:bg-slate-800/80 rounded-xl text-xs font-medium">
+      <div className={`grid grid-cols-4 gap-1 p-0.5 rounded-xl text-xs font-medium ${isPinkTheme ? 'bg-pink-100/70' : 'bg-slate-200/60 dark:bg-slate-800/80'}`}>
         <button
           onClick={() => setSelectedType('all')}
           className={`py-1.5 rounded-lg transition text-center ${
             selectedType === 'all'
-              ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-bold shadow-2xs'
-              : 'text-slate-500 hover:text-slate-800'
+              ? isPinkTheme ? 'bg-white text-rose-600 font-bold shadow-2xs' : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-bold shadow-2xs'
+              : isPinkTheme ? 'text-pink-600/70 hover:text-pink-900' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           Semua
@@ -150,7 +153,7 @@ export const TransaksiView: React.FC = () => {
           className={`py-1.5 rounded-lg transition text-center ${
             selectedType === 'expense'
               ? 'bg-white dark:bg-slate-700 text-rose-600 dark:text-rose-400 font-bold shadow-2xs'
-              : 'text-slate-500 hover:text-slate-800'
+              : isPinkTheme ? 'text-pink-600/70 hover:text-pink-900' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           Keluar
@@ -159,8 +162,8 @@ export const TransaksiView: React.FC = () => {
           onClick={() => setSelectedType('income')}
           className={`py-1.5 rounded-lg transition text-center ${
             selectedType === 'income'
-              ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 font-bold shadow-2xs'
-              : 'text-slate-500 hover:text-slate-800'
+              ? isPinkTheme ? 'bg-white text-emerald-600 font-bold shadow-2xs' : 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 font-bold shadow-2xs'
+              : isPinkTheme ? 'text-pink-600/70 hover:text-pink-900' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           Masuk
@@ -170,7 +173,7 @@ export const TransaksiView: React.FC = () => {
           className={`py-1.5 rounded-lg transition text-center ${
             selectedType === 'transfer'
               ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 font-bold shadow-2xs'
-              : 'text-slate-500 hover:text-slate-800'
+              : isPinkTheme ? 'text-pink-600/70 hover:text-pink-900' : 'text-slate-500 hover:text-slate-800'
           }`}
         >
           Transfer

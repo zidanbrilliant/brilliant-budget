@@ -49,6 +49,15 @@ import {
   Eye,
   EyeOff,
   Bell,
+  Heart,
+  Smile,
+  Star,
+  Crown,
+  Coffee,
+  Flower2,
+  Cake,
+  Shirt,
+  Gem,
   LucideProps,
 } from 'lucide-react';
 
@@ -102,6 +111,15 @@ const iconMap: Record<string, React.FC<LucideProps>> = {
   Eye,
   EyeOff,
   Bell,
+  Heart,
+  Smile,
+  Star,
+  Crown,
+  Coffee,
+  Flower2,
+  Cake,
+  Shirt,
+  Gem,
 };
 
 export const getIconComponent = (name: string, fallback = CircleEllipsis): React.FC<LucideProps> => {

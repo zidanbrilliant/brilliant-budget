@@ -1,118 +1,156 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <defs>
-    <!-- Deep Obsidian Background Gradient -->
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#0F172A" />
-      <stop offset="50%" stop-color="#0B0F19" />
-      <stop offset="100%" stop-color="#050811" />
+    <!-- Background Gradient: Soft Strawberry Milk Pastel -->
+    <linearGradient id="bgPastel" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFF0F4" />
+      <stop offset="50%" stop-color="#FFE4EB" />
+      <stop offset="100%" stop-color="#FDD5E0" />
     </linearGradient>
 
-    <!-- Radial Emerald Ambient Glow -->
-    <radialGradient id="ambientGlow" cx="50%" cy="45%" r="45%">
-      <stop offset="0%" stop-color="#059669" stop-opacity="0.32" />
-      <stop offset="60%" stop-color="#047857" stop-opacity="0.10" />
-      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    <!-- Radial Soft Glow in Center -->
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.8" />
+      <stop offset="60%" stop-color="#FFE8EF" stop-opacity="0.3" />
+      <stop offset="100%" stop-color="#FDD5E0" stop-opacity="0" />
     </radialGradient>
 
-    <!-- Facet Gradients for the Brilliant Diamond Vault -->
-    <linearGradient id="tableFacet" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#34D399" />
-      <stop offset="100%" stop-color="#10B981" />
+    <!-- Piggy Body Gradient (Soft Bubbly 3D Pink) -->
+    <linearGradient id="pigBody" x1="20%" y1="10%" x2="70%" y2="90%">
+      <stop offset="0%" stop-color="#FFF5F7" />
+      <stop offset="20%" stop-color="#FFCAD4" />
+      <stop offset="70%" stop-color="#F497A9" />
+      <stop offset="100%" stop-color="#E5788E" />
     </linearGradient>
 
-    <linearGradient id="topFacetLeft" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#6EE7B7" />
-      <stop offset="100%" stop-color="#10B981" />
+    <!-- Inner Ear Gradient -->
+    <linearGradient id="innerEar" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FB7185" />
+      <stop offset="100%" stop-color="#E11D48" />
     </linearGradient>
 
-    <linearGradient id="topFacetRight" x1="100%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#10B981" />
-      <stop offset="100%" stop-color="#047857" />
+    <!-- Snout Gradient -->
+    <linearGradient id="snoutGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFE8ED" />
+      <stop offset="60%" stop-color="#FFA8BA" />
+      <stop offset="100%" stop-color="#F2859B" />
     </linearGradient>
 
-    <linearGradient id="centerDiamond" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#A7F3D0" />
-      <stop offset="100%" stop-color="#34D399" />
+    <!-- Ribbon / Bow Gradient (Strawberry Blossom) -->
+    <linearGradient id="ribbonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FB7185" />
+      <stop offset="50%" stop-color="#F43F5E" />
+      <stop offset="100%" stop-color="#BE123C" />
     </linearGradient>
 
-    <linearGradient id="midFacetLeft" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#10B981" />
-      <stop offset="100%" stop-color="#059669" />
+    <!-- Gold Sparkling Coin Gradient -->
+    <linearGradient id="goldCoin" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF08A" />
+      <stop offset="40%" stop-color="#FACC15" />
+      <stop offset="85%" stop-color="#EAB308" />
+      <stop offset="100%" stop-color="#CA8A04" />
     </linearGradient>
 
-    <linearGradient id="midFacetRight" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#047857" />
-      <stop offset="100%" stop-color="#064E3B" />
-    </linearGradient>
+    <!-- Soft Drop Shadow -->
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="28" stdDeviation="30" flood-color="#BE123C" flood-opacity="0.18" />
+    </filter>
 
-    <linearGradient id="lowerFacetLeft" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#059669" />
-      <stop offset="100%" stop-color="#065F46" />
-    </linearGradient>
-
-    <linearGradient id="lowerFacetRight" x1="100%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#064E3B" />
-      <stop offset="100%" stop-color="#022C22" />
-    </linearGradient>
-
-    <linearGradient id="bottomApex" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#10B981" />
-      <stop offset="100%" stop-color="#059669" />
-    </linearGradient>
-
-    <!-- Subtle Drop Shadow for Emblem -->
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="24" stdDeviation="32" flood-color="#000000" flood-opacity="0.6" />
+    <filter id="coinGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#F59E0B" flood-opacity="0.35" />
     </filter>
   </defs>
 
-  <!-- Solid Opaque Background (Apple Requirement: No Transparency) -->
-  <rect width="1024" height="1024" fill="url(#bgGrad)" />
+  <!-- Solid Opaque Apple HIG Background (No transparency) -->
+  <rect width="1024" height="1024" fill="url(#bgPastel)" />
+  <circle cx="512" cy="530" r="460" fill="url(#centerGlow)" />
 
-  <!-- Ambient Light Sphere -->
-  <circle cx="512" cy="510" r="440" fill="url(#ambientGlow)" />
+  <!-- Cute Decorative Pastel Sparkles & Floating Hearts in Background -->
+  <!-- Top Left Sparkle -->
+  <path d="M180 230 Q180 260 150 260 Q180 260 180 290 Q180 260 210 260 Q180 260 180 230 Z" fill="#FB7185" opacity="0.6" />
+  <circle cx="140" cy="210" r="8" fill="#FDA4AF" opacity="0.7" />
+  <!-- Top Right Little Heart -->
+  <path d="M840 220 C840 205 825 195 810 205 C795 195 780 205 780 220 C780 240 810 260 810 260 C810 260 840 240 840 220 Z" fill="#F43F5E" opacity="0.5" />
+  <circle cx="870" cy="270" r="7" fill="#FB7185" opacity="0.6" />
+  <!-- Bottom Left Tiny Heart -->
+  <path d="M160 780 C160 768 148 760 136 768 C124 760 112 768 112 780 C112 796 136 812 136 812 C136 812 160 796 160 780 Z" fill="#FDA4AF" opacity="0.6" />
 
-  <!-- Outer Protective Halo Ring -->
-  <circle cx="512" cy="512" r="390" fill="none" stroke="#10B981" stroke-width="1.5" stroke-opacity="0.2" />
-  <circle cx="512" cy="512" r="380" fill="none" stroke="#34D399" stroke-width="1" stroke-opacity="0.15" stroke-dasharray="16 12" />
+  <!-- Shadow Beneath Piggy Feet -->
+  <ellipse cx="512" cy="855" rx="310" ry="42" fill="#E2879B" opacity="0.28" />
 
-  <!-- Central Brilliant Diamond-Vault Glyph -->
-  <g filter="url(#shadow)">
-    <!-- Top Crown Table Facet -->
-    <polygon points="340,270 684,270 604,395 420,395" fill="url(#tableFacet)" stroke="#ECFDF5" stroke-width="1" stroke-opacity="0.4" />
+  <!-- Main Cute Piggy Bank Character Container -->
+  <g filter="url(#softShadow)">
+    <!-- Curly Little Tail (Right) -->
+    <path d="M780 610 C825 615 855 585 845 555 C835 525 800 535 805 565" fill="none" stroke="#F497A9" stroke-width="26" stroke-linecap="round" />
 
-    <!-- Top Left Facet -->
-    <polygon points="340,270 200,395 420,395" fill="url(#topFacetLeft)" stroke="#ECFDF5" stroke-width="1" stroke-opacity="0.3" />
+    <!-- Cute Little Back Feet -->
+    <rect x="330" y="740" width="85" height="95" rx="42" fill="#E5788E" />
+    <rect x="610" y="740" width="85" height="95" rx="42" fill="#E5788E" />
+    <!-- Front Feet -->
+    <rect x="290" y="750" width="90" height="95" rx="45" fill="#FFA4B2" />
+    <rect x="645" y="750" width="90" height="95" rx="45" fill="#FFA4B2" />
 
-    <!-- Top Right Facet -->
-    <polygon points="684,270 824,395 604,395" fill="url(#topFacetRight)" stroke="#ECFDF5" stroke-width="1" stroke-opacity="0.3" />
+    <!-- Left Ear (Back) -->
+    <path d="M310 390 C290 280 220 310 215 360 C210 410 270 450 310 440 Z" fill="#FFCAD4" stroke="#FFA4B2" stroke-width="4" />
+    <path d="M295 385 C280 310 240 330 235 365 C230 400 270 425 295 415 Z" fill="url(#innerEar)" opacity="0.75" />
 
-    <!-- Center Upper Diamond Keystone -->
-    <polygon points="420,395 604,395 512,525" fill="url(#centerDiamond)" stroke="#FFFFFF" stroke-width="1.5" stroke-opacity="0.6" />
+    <!-- Right Ear -->
+    <path d="M680 375 C705 270 775 295 785 345 C795 395 735 440 690 435 Z" fill="#FFCAD4" stroke="#FFA4B2" stroke-width="4" />
+    <path d="M695 375 C715 305 755 320 760 355 C765 390 725 420 695 410 Z" fill="url(#innerEar)" opacity="0.75" />
 
-    <!-- Mid Left Facet -->
-    <polygon points="200,395 420,395 512,525 330,590" fill="url(#midFacetLeft)" stroke="#ECFDF5" stroke-width="1" stroke-opacity="0.25" />
+    <!-- Plump Round Piggy Bank Body -->
+    <ellipse cx="512" cy="590" rx="310" ry="260" fill="url(#pigBody)" />
 
-    <!-- Mid Right Facet -->
-    <polygon points="824,395 604,395 512,525 694,590" fill="url(#midFacetRight)" stroke="#ECFDF5" stroke-width="1" stroke-opacity="0.25" />
+    <!-- Highlights on Piggy Back/Forehead -->
+    <ellipse cx="460" cy="420" rx="140" ry="70" fill="#FFFFFF" opacity="0.32" transform="rotate(-12 460 420)" />
 
-    <!-- Lower Vault Body - Left Core -->
-    <polygon points="330,590 512,525 512,790" fill="url(#lowerFacetLeft)" stroke="#ECFDF5" stroke-width="1" stroke-opacity="0.2" />
+    <!-- Coin Slot on Top -->
+    <rect x="445" y="340" width="134" height="20" rx="10" fill="#3B1219" opacity="0.8" />
+  </g>
 
-    <!-- Lower Vault Body - Right Core -->
-    <polygon points="694,590 512,525 512,790" fill="url(#lowerFacetRight)" stroke="#ECFDF5" stroke-width="1" stroke-opacity="0.2" />
+  <!-- Glowing Golden Coin entering slot -->
+  <g filter="url(#coinGlow)">
+    <circle cx="512" cy="275" r="95" fill="url(#goldCoin)" stroke="#FEF08A" stroke-width="8" />
+    <!-- Inner Coin Rim -->
+    <circle cx="512" cy="275" r="76" fill="none" stroke="#CA8A04" stroke-width="5" stroke-dasharray="14 10" opacity="0.85" />
+    <!-- Embossed Cute Sparkle / Star in Coin -->
+    <path d="M512 215 Q512 275 452 275 Q512 275 512 335 Q512 275 572 275 Q512 275 512 215 Z" fill="#FFFFFF" />
+    <circle cx="512" cy="275" r="14" fill="#FDE047" />
+  </g>
+  <!-- Sparkles on Coin -->
+  <path d="M595 190 Q595 210 575 210 Q595 210 595 230 Q595 210 615 210 Q595 210 595 190 Z" fill="#FFFFFF" />
+  <circle cx="625" cy="180" r="6" fill="#FEF08A" />
 
-    <!-- Outer Lower Flanks - Left -->
-    <polygon points="200,395 330,590 512,790" fill="url(#midFacetLeft)" fill-opacity="0.8" stroke="#10B981" stroke-width="1" stroke-opacity="0.2" />
+  <!-- Piggy Face Details -->
+  <!-- Cute Blushing Cheeks (Pip Merona) -->
+  <ellipse cx="330" cy="595" rx="52" ry="32" fill="#FB7185" opacity="0.45" />
+  <ellipse cx="694" cy="595" rx="52" ry="32" fill="#FB7185" opacity="0.45" />
 
-    <!-- Outer Lower Flanks - Right -->
-    <polygon points="824,395 694,590 512,790" fill="url(#midFacetRight)" fill-opacity="0.8" stroke="#047857" stroke-width="1" stroke-opacity="0.2" />
+  <!-- Happy Curved Eyes (Mata Tersenyum Manis / Chibi) -->
+  <path d="M360 520 C360 490 415 490 415 520" fill="none" stroke="#3B1219" stroke-width="14" stroke-linecap="round" />
+  <path d="M609 520 C609 490 664 490 664 520" fill="none" stroke="#3B1219" stroke-width="14" stroke-linecap="round" />
+  <!-- Eyelashes -->
+  <path d="M410 495 L425 480" stroke="#3B1219" stroke-width="9" stroke-linecap="round" />
+  <path d="M660 495 L675 480" stroke="#3B1219" stroke-width="9" stroke-linecap="round" />
 
-    <!-- Internal Radiant Micro-Star / Sparkle at Pavilion Center -->
-    <circle cx="512" cy="525" r="5" fill="#FFFFFF" opacity="0.9" />
-    <path d="M512 485 L516 521 L552 525 L516 529 L512 565 L508 529 L472 525 L508 521 Z" fill="#FFFFFF" opacity="0.75" />
+  <!-- Cute Oval Snout (Hidung Imut) -->
+  <ellipse cx="512" cy="595" rx="105" ry="72" fill="url(#snoutGrad)" stroke="#FFA4B2" stroke-width="4" />
+  <ellipse cx="495" cy="565" rx="50" ry="20" fill="#FFFFFF" opacity="0.45" />
+  <!-- Nostrils (Dua Lubang Hidung Hati / Oval) -->
+  <ellipse cx="475" cy="598" rx="15" ry="22" fill="#9F1239" opacity="0.8" />
+  <ellipse cx="549" cy="598" rx="15" ry="22" fill="#9F1239" opacity="0.8" />
 
-    <!-- Inner Financial Growth Pillar Accent (Vertical Vault Seam) -->
-    <line x1="512" y1="525" x2="512" y2="788" stroke="#34D399" stroke-width="2.5" stroke-opacity="0.8" stroke-linecap="round" />
+  <!-- Cute Ribbon / Bow on Left Ear (Pita Merah Muda Manis) -->
+  <g transform="translate(290, 370) rotate(-18)">
+    <!-- Left Bow Wing -->
+    <path d="M-8 0 C-65 -45 -95 10 -40 25 C-95 40 -65 95 -8 50 Z" fill="url(#ribbonGrad)" stroke="#FFE4E6" stroke-width="3" />
+    <path d="M-35 22 C-55 10 -65 25 -45 30 Z" fill="#FFE4E6" opacity="0.5" />
+    <!-- Right Bow Wing -->
+    <path d="M8 0 C65 -45 95 10 40 25 C95 40 65 95 8 50 Z" fill="url(#ribbonGrad)" stroke="#FFE4E6" stroke-width="3" />
+    <path d="M35 22 C55 10 65 25 45 30 Z" fill="#FFE4E6" opacity="0.5" />
+    <!-- Center Ribbon Knot -->
+    <ellipse cx="0" cy="25" rx="20" ry="22" fill="#BE123C" stroke="#FFE4E6" stroke-width="3" />
+    <!-- Ribbon Tails -->
+    <path d="M-10 45 C-25 80 -40 100 -50 115 C-30 105 -15 108 0 115 L-5 45 Z" fill="#E11D48" />
+    <path d="M10 45 C25 80 40 100 50 115 C30 105 15 108 0 115 L5 45 Z" fill="#BE123C" />
   </g>
 </svg>

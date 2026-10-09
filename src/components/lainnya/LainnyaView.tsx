@@ -44,6 +44,7 @@ export const LainnyaView: React.FC = () => {
   } = useApp();
 
   const [activeSection, setActiveSection] = useState<'menu' | 'dompet' | 'laporan' | 'backup' | 'sms_simulator' | 'kategori'>('menu');
+  const isPinkTheme = settings.theme === 'pink';
 
   // Custom Category Modal (FR-35)
   const [isAddCatOpen, setIsAddCatOpen] = useState(false);
@@ -352,9 +353,42 @@ export const LainnyaView: React.FC = () => {
           {/* Section: Sistem */}
           <div className="space-y-1.5">
             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
-              Sistem
+              Sistem & Tema
             </span>
             <div className="bg-white dark:bg-[#151E2E] rounded-2xl divide-y divide-slate-100 dark:divide-slate-800/80 border border-slate-200/80 dark:border-slate-800/80 shadow-xs text-xs overflow-hidden">
+              <div className="p-3.5 flex items-center justify-between">
+                <div>
+                  <div className="font-semibold text-slate-800 dark:text-slate-200">Tema Warna</div>
+                  <div className="text-[11px] text-slate-400">Pilih estetika tampilan favoritmu</div>
+                </div>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => updateSettings({ theme: 'pink' })}
+                    className={`px-2.5 py-1 rounded-xl font-bold text-xs transition active:scale-95 ${
+                      settings.theme === 'pink' ? 'bg-rose-500 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    🌸 Pink
+                  </button>
+                  <button
+                    onClick={() => updateSettings({ theme: 'light' })}
+                    className={`px-2.5 py-1 rounded-xl font-bold text-xs transition active:scale-95 ${
+                      settings.theme === 'light' ? 'bg-slate-900 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    ⚪ Light
+                  </button>
+                  <button
+                    onClick={() => updateSettings({ theme: 'dark' })}
+                    className={`px-2.5 py-1 rounded-xl font-bold text-xs transition active:scale-95 ${
+                      settings.theme === 'dark' ? 'bg-slate-800 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    🌙 Dark
+                  </button>
+                </div>
+              </div>
+
               <div className="p-3.5 flex items-center justify-between">
                 <span className="font-medium text-slate-700 dark:text-slate-300">Privasi Server</span>
                 <span className="font-bold text-emerald-600">100% On-Device</span>

@@ -3,9 +3,11 @@ import { useApp } from '../../context/AppContext';
 import { ShieldCheck, Fingerprint } from 'lucide-react';
 
 export const LockScreen: React.FC = () => {
-  const { isLocked, setIsLocked } = useApp();
+  const { isLocked, setIsLocked, settings } = useApp();
   const [pinInput, setPinInput] = useState('');
   const [isBiometricAuthenticating, setIsBiometricAuthenticating] = useState(false);
+
+  const isPinkTheme = settings.theme === 'pink';
 
   if (!isLocked) return null;
 
@@ -35,11 +37,11 @@ export const LockScreen: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0B0F19]/95 backdrop-blur-xl flex flex-col items-center justify-between px-6 py-4 text-white select-none animate-scale-up">
+    <div className={`fixed inset-0 z-50 ${isPinkTheme ? 'bg-[#2E1019]/96' : 'bg-[#0B0F19]/95'} backdrop-blur-xl flex flex-col items-center justify-between px-6 py-4 text-white select-none animate-scale-up`}>
       <div className="w-full flex justify-center pt-safe-top">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 bg-slate-800/80 px-3.5 py-1.5 rounded-full border border-slate-700/60 shadow-xs">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Brilliant Budget Terkunci</span>
+        <div className={`flex items-center gap-1.5 text-xs font-semibold ${isPinkTheme ? 'text-pink-200 bg-pink-900/60 border-pink-700/60' : 'text-slate-300 bg-slate-800/80 border-slate-700/60'} px-3.5 py-1.5 rounded-full border shadow-xs`}>
+          <ShieldCheck className={`w-3.5 h-3.5 ${isPinkTheme ? 'text-rose-400' : 'text-emerald-400'}`} />
+          <span>{isPinkTheme ? 'Brilliant Budget Terkunci 🎀' : 'Brilliant Budget Terkunci'}</span>
         </div>
       </div>
 
@@ -47,11 +49,11 @@ export const LockScreen: React.FC = () => {
       <div className="flex flex-col items-center space-y-4">
         <button
           onClick={handleSimulateFaceID}
-          className="w-16 h-16 rounded-full bg-slate-800/80 border border-slate-700/80 flex items-center justify-center hover:scale-105 active:scale-95 transition shadow-xs group"
+          className={`w-16 h-16 rounded-full ${isPinkTheme ? 'bg-pink-950/80 border-pink-700/70' : 'bg-slate-800/80 border-slate-700/80'} border flex items-center justify-center hover:scale-105 active:scale-95 transition shadow-xs group`}
         >
           <Fingerprint
             className={`w-8 h-8 ${
-              isBiometricAuthenticating ? 'text-emerald-400 animate-pulse' : 'text-slate-300'
+              isBiometricAuthenticating ? (isPinkTheme ? 'text-rose-400 animate-pulse' : 'text-emerald-400 animate-pulse') : 'text-slate-300'
             }`}
           />
         </button>
@@ -69,7 +71,7 @@ export const LockScreen: React.FC = () => {
             <div
               key={idx}
               className={`w-3 h-3 rounded-full border border-slate-600 transition-all ${
-                pinInput.length > idx ? 'bg-white border-white scale-110' : 'bg-transparent'
+                pinInput.length > idx ? (isPinkTheme ? 'bg-rose-400 border-rose-400 scale-110' : 'bg-white border-white scale-110') : 'bg-transparent'
               }`}
             ></div>
           ))}
