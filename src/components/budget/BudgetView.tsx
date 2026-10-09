@@ -33,12 +33,12 @@ export const BudgetView: React.FC = () => {
   // New Goal modal state
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [goalName, setGoalName] = useState('');
-  const [goalTarget, setGoalTarget] = useState(5000000);
+  const [goalTarget, setGoalTarget] = useState(0);
 
   // New Recurring modal state
   const [isAddRecurringOpen, setIsAddRecurringOpen] = useState(false);
   const [recName, setRecName] = useState('');
-  const [recAmount, setRecAmount] = useState(150000);
+  const [recAmount, setRecAmount] = useState(0);
   const [recDay, setRecDay] = useState(1);
   const [recIsSub, setRecIsSub] = useState(true);
   const [recTenor, setRecTenor] = useState(12);
@@ -47,9 +47,9 @@ export const BudgetView: React.FC = () => {
 
   // Summary
   const summary = getMonthSummary();
-  const totalBudget = budget.total_limit;
+  const totalBudget = budget.total_limit || 0;
   const totalSpent = summary.expense;
-  const spentPercent = Math.min(100, Math.round((totalSpent / totalBudget) * 100));
+  const spentPercent = totalBudget > 0 ? Math.min(100, Math.round((totalSpent / totalBudget) * 100)) : 0;
 
   const subscriptions = recurring.filter(r => r.is_subscription);
   const monthlySubCost = subscriptions.reduce((sum, r) => sum + r.amount, 0);
@@ -258,9 +258,9 @@ export const BudgetView: React.FC = () => {
               {budget.lines.map(line => {
                 const cat = categories.find(c => c.id === line.category_id);
                 const spent = line.category_id ? getCategorySpending(line.category_id) : 0;
-                const percent = Math.min(100, Math.round((spent / line.amount) * 100));
-                const isOver = spent > line.amount;
-                const isNear = percent >= 80 && !isOver;
+                const percent = line.amount > 0 ? Math.min(100, Math.round((spent / line.amount) * 100)) : 0;
+                const isOver = line.amount > 0 && spent > line.amount;
+                const isNear = line.amount > 0 && percent >= 80 && !isOver;
 
                 return (
                   <div key={line.id} className="p-3.5 space-y-2">
@@ -334,45 +334,56 @@ export const BudgetView: React.FC = () => {
             </div>
 
             <div className="bg-white dark:bg-[#151E2E] rounded-2xl divide-y divide-slate-100 dark:divide-slate-800/80 border border-slate-200/80 dark:border-slate-800/80 shadow-xs overflow-hidden">
-              {recurring.map(rule => {
-                return (
-                  <div
-                    key={rule.id}
-                    className="p-3.5 flex items-center justify-between gap-3"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
-                        <Repeat className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                          {rule.name}
+              {recurring.length === 0 ? (
+                <div className="py-8 px-4 text-center space-y-1">
+                  <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Belum ada langganan atau cicilan
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    Ketuk tombol + Langganan untuk menambahkan layanan rutin.
+                  </p>
+                </div>
+              ) : (
+                recurring.map(rule => {
+                  return (
+                    <div
+                      key={rule.id}
+                      className="p-3.5 flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
+                          <Repeat className="w-4 h-4" />
                         </div>
-                        <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                          <span>Tiap tgl {rule.day_of_month || 1}</span>
-                          {rule.total_tenor && (
-                            <>
-                              <span>•</span>
-                              <span className="font-semibold text-emerald-600">
-                                Tenor: {rule.remaining_tenor}/{rule.total_tenor} bln
-                              </span>
-                            </>
-                          )}
+                        <div>
+                          <div className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                            {rule.name}
+                          </div>
+                          <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                            <span>Tiap tgl {rule.day_of_month || 1}</span>
+                            {rule.total_tenor && (
+                              <>
+                                <span>•</span>
+                                <span className="font-semibold text-emerald-600">
+                                  Tenor: {rule.remaining_tenor}/{rule.total_tenor} bln
+                                </span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="text-right">
-                      <div className="text-xs font-bold tabular-nums text-slate-900 dark:text-white">
-                        {formatIDR(rule.amount)}
+                      <div className="text-right">
+                        <div className="text-xs font-bold tabular-nums text-slate-900 dark:text-white">
+                          {formatIDR(rule.amount)}
+                        </div>
+                        <span className="text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1 py-0.2 rounded font-medium">
+                          {rule.mode === 'auto' ? 'Otomatis' : 'Draft'}
+                        </span>
                       </div>
-                      <span className="text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1 py-0.2 rounded font-medium">
-                        {rule.mode === 'auto' ? 'Otomatis' : 'Draft'}
-                      </span>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
@@ -395,53 +406,64 @@ export const BudgetView: React.FC = () => {
           </div>
 
           <div className="space-y-2.5">
-            {goals.map(goal => {
-              const progress = Math.min(
-                100,
-                Math.round((goal.saved_amount / goal.target_amount) * 100)
-              );
-              const remaining = Math.max(0, goal.target_amount - goal.saved_amount);
+            {goals.length === 0 ? (
+              <div className="bg-white dark:bg-[#151E2E] rounded-2xl p-8 text-center border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-1">
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Belum ada target tabungan
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Mulai rencanakan impian Anda dengan mengetuk tombol Buat Target.
+                </p>
+              </div>
+            ) : (
+              goals.map(goal => {
+                const progress = goal.target_amount > 0 ? Math.min(
+                  100,
+                  Math.round((goal.saved_amount / goal.target_amount) * 100)
+                ) : 0;
+                const remaining = Math.max(0, goal.target_amount - goal.saved_amount);
 
-              return (
-                <div
-                  key={goal.id}
-                  className="bg-white dark:bg-[#151E2E] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-2.5"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-900 dark:text-white">
-                        {goal.name}
-                      </h4>
-                      <div className="text-[11px] text-slate-400 mt-0.5 tabular-nums">
-                        Sisa: {formatIDR(remaining)}
+                return (
+                  <div
+                    key={goal.id}
+                    className="bg-white dark:bg-[#151E2E] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-2.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                          {goal.name}
+                        </h4>
+                        <div className="text-[11px] text-slate-400 mt-0.5 tabular-nums">
+                          Sisa: {formatIDR(remaining)}
+                        </div>
                       </div>
+                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/80 px-2 py-0.5 rounded-md tabular-nums">
+                        {progress}%
+                      </span>
                     </div>
-                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/80 px-2 py-0.5 rounded-md tabular-nums">
-                      {progress}%
-                    </span>
-                  </div>
 
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                    <div
-                      className="bg-emerald-500 h-full rounded-full transition-all duration-300"
-                      style={{ width: `${progress}%` }}
-                    ></div>
-                  </div>
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                        style={{ width: `${progress}%` }}
+                      ></div>
+                    </div>
 
-                  <div className="flex items-center justify-between pt-1 text-xs">
-                    <span className="text-slate-500 dark:text-slate-400 font-medium tabular-nums">
-                      {formatCompactIDR(goal.saved_amount)} / {formatCompactIDR(goal.target_amount)}
-                    </span>
-                    <button
-                      onClick={() => contributeToGoal(goal.id, 500000)}
-                      className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
-                    >
-                      + Nabung 500rb
-                    </button>
+                    <div className="flex items-center justify-between pt-1 text-xs">
+                      <span className="text-slate-500 dark:text-slate-400 font-medium tabular-nums">
+                        {formatCompactIDR(goal.saved_amount)} / {formatCompactIDR(goal.target_amount)}
+                      </span>
+                      <button
+                        onClick={() => contributeToGoal(goal.id, 500000)}
+                        className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                      >
+                        + Nabung 500rb
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       )}

@@ -136,16 +136,16 @@ function seedInitialDataIfEmpty() {
   const now = Date.now();
   const day = 86400000;
 
-  // 1. Seed Accounts
+  // 1. Seed Accounts (Default Saldo Awal = 0)
   const insertAcc = db.prepare(`
     INSERT INTO account (id, name, type, currency, opening_balance, icon, color, is_archived, created_at, updated_at)
-    VALUES (?, ?, ?, 'IDR', ?, ?, ?, 0, ?, ?)
+    VALUES (?, ?, ?, 'IDR', 0, ?, ?, 0, ?, ?)
   `);
 
-  insertAcc.run('acc-bca', 'BCA Utama', 'bank', 14500000, 'Landmark', '#0F172A', now, now);
-  insertAcc.run('acc-gopay', 'GoPay', 'ewallet', 385000, 'Smartphone', '#334155', now, now);
-  insertAcc.run('acc-cash', 'Uang Tunai', 'cash', 240000, 'Banknote', '#059669', now, now);
-  insertAcc.run('acc-shopeepay', 'ShopeePay', 'ewallet', 115000, 'CreditCard', '#475569', now, now);
+  insertAcc.run('acc-bca', 'BCA Utama', 'bank', 'Landmark', '#0F172A', now, now);
+  insertAcc.run('acc-gopay', 'GoPay', 'ewallet', 'Smartphone', '#334155', now, now);
+  insertAcc.run('acc-cash', 'Uang Tunai', 'cash', 'Banknote', '#059669', now, now);
+  insertAcc.run('acc-shopeepay', 'ShopeePay', 'ewallet', 'CreditCard', '#475569', now, now);
 
   // 2. Seed Categories (Minimalist 2-3 Colors)
   const insertCat = db.prepare(`
@@ -166,66 +166,27 @@ function seedInitialDataIfEmpty() {
   insertCat.run('cat-invest', 'Hasil Investasi', 'income', 'TrendingUp', '#059669', 3, now, now);
   insertCat.run('cat-hadiah', 'Hadiah / Cashback', 'income', 'Gift', '#059669', 4, now, now);
 
-  // 3. Seed Transactions (termasuk 3 draft Inbox PRD 6.5)
-  const insertTxn = db.prepare(`
-    INSERT INTO txn (
-      id, type, amount, account_id, to_account_id, category_id, merchant, occurred_at,
-      note, status, source, external_ref, confidence, admin_fee, raw_source_text, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
+  // 3. Clean Slate: Tidak ada transaksi tiruan awal (default 0 transaksi)
 
-  // Drafts
-  insertTxn.run('txn-draft-1', 'expense', 35000, 'acc-gopay', null, 'cat-makan', 'Soto Betawi Bang Ali', now - 35 * 60000, 'Makan siang sama teman kantor', 'draft', 'voice', null, 0.92, null, '"Makan siang soto betawi 35 ribu pakai GoPay"', now, now);
-  insertTxn.run('txn-draft-2', 'expense', 54500, 'acc-bca', null, 'cat-belanja', 'Indomaret Point Sudirman', now - 3 * 3600000, 'Roti, susu oat, air mineral', 'draft', 'ocr', 'IND-994182', 0.88, null, 'Foto Struk Kasir Indomaret Point total Rp 54.500', now, now);
-  insertTxn.run('txn-draft-3', 'expense', 22000, 'acc-gopay', null, 'cat-trans', 'Gojek Ride', now - 6 * 3600000, 'Transport ke kantor pagi', 'draft', 'notification', 'GK-88271', 0.96, null, 'Notifikasi: Pembayaran GoRide berhasil Rp 22.000 ke Gojek', now, now);
-
-  // Confirmed
-  insertTxn.run('txn-conf-1', 'expense', 25000, 'acc-gopay', null, 'cat-makan', 'Kopi Kenangan', now - 5 * 3600000, 'Kopi Kenangan Mantan Large', 'confirmed', 'qr', null, 0.99, null, null, now, now);
-  insertTxn.run('txn-conf-2', 'expense', 14000, 'acc-bca', null, 'cat-trans', 'MRT Jakarta', now - 7 * 3600000, 'Tap in Bundaran HI - Blok M', 'confirmed', 'manual', null, 1.0, null, null, now, now);
-  insertTxn.run('txn-conf-3', 'expense', 185000, 'acc-bca', null, 'cat-tagihan', 'PLN Pascabayar', now - day, 'Listrik kos bulanan', 'confirmed', 'ocr', 'PLN-202610-09', 0.95, null, null, now, now);
-  insertTxn.run('txn-conf-4', 'expense', 45000, 'acc-cash', null, 'cat-makan', 'Warung Nasi Padang', now - day - 4 * 3600000, 'Ayam pop + es teh manis', 'confirmed', 'manual', null, 1.0, null, null, now, now);
-  insertTxn.run('txn-conf-5', 'income', 9500000, 'acc-bca', null, 'cat-gaji', 'PT Solusi Teknologi', now - 4 * day, 'Gaji Oktober 2026', 'confirmed', 'sms', 'BCA-SAL-1026', 1.0, null, null, now, now);
-  insertTxn.run('txn-conf-6', 'transfer', 500000, 'acc-bca', 'acc-gopay', null, null, now - 3 * day, 'Top up GoPay jajan', 'confirmed', 'manual', null, 1.0, 1000, null, now, now);
-  insertTxn.run('txn-conf-7', 'expense', 120000, 'acc-bca', null, 'cat-hiburan', 'Cinema XXI', now - 2 * day, 'Nonton film 2 tiket + popcorn', 'confirmed', 'manual', null, 1.0, null, null, now, now);
-
-  // 4. Seed Budget Plan & Lines
+  // 4. Seed Budget Plan & Lines (Default 0)
   const insertPlan = db.prepare(`
     INSERT INTO budget_plan (id, method, period, start_day, is_active, total_limit, created_at, updated_at)
-    VALUES (?, ?, ?, ?, 1, ?, ?, ?)
+    VALUES (?, ?, ?, ?, 1, 0, ?, ?)
   `);
-  insertPlan.run('budget-active-1', 'category', 'monthly', 1, 5500000, now, now);
+  insertPlan.run('budget-active-1', 'category', 'monthly', 1, now, now);
 
   const insertLine = db.prepare(`
     INSERT INTO budget_line (id, plan_id, category_id, name, amount, rollover)
-    VALUES (?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, 0, ?)
   `);
-  insertLine.run('b-line-1', 'budget-active-1', 'cat-makan', 'Makan & Minum', 2000000, 1);
-  insertLine.run('b-line-2', 'budget-active-1', 'cat-trans', 'Transportasi', 750000, 0);
-  insertLine.run('b-line-3', 'budget-active-1', 'cat-belanja', 'Belanja Harian', 1000000, 0);
-  insertLine.run('b-line-4', 'budget-active-1', 'cat-tagihan', 'Tagihan & Utilitas', 950000, 0);
-  insertLine.run('b-line-5', 'budget-active-1', 'cat-hiburan', 'Hiburan & Hobi', 500000, 0);
-  insertLine.run('b-line-6', 'budget-active-1', 'cat-kesehatan', 'Kesehatan', 300000, 1);
+  insertLine.run('b-line-1', 'budget-active-1', 'cat-makan', 'Makan & Minum', 1);
+  insertLine.run('b-line-2', 'budget-active-1', 'cat-trans', 'Transportasi', 0);
+  insertLine.run('b-line-3', 'budget-active-1', 'cat-belanja', 'Belanja Harian', 0);
+  insertLine.run('b-line-4', 'budget-active-1', 'cat-tagihan', 'Tagihan & Utilitas', 0);
+  insertLine.run('b-line-5', 'budget-active-1', 'cat-hiburan', 'Hiburan & Hobi', 0);
+  insertLine.run('b-line-6', 'budget-active-1', 'cat-kesehatan', 'Kesehatan', 1);
 
-  // 5. Seed Recurring Rules
-  const insertRec = db.prepare(`
-    INSERT INTO recurring_rule (
-      id, name, type, amount, account_id, category_id, frequency, interval,
-      day_of_month, next_run_at, mode, is_active, is_subscription, total_tenor, remaining_tenor
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, 1, ?, ?, ?)
-  `);
-  insertRec.run('rec-netflix', 'Netflix Premium', 'expense', 186000, 'acc-bca', 'cat-hiburan', 'monthly', 15, now + 7 * day, 'auto', 1, null, null);
-  insertRec.run('rec-bpjs', 'BPJS Kesehatan Mandiri', 'expense', 150000, 'acc-bca', 'cat-kesehatan', 'monthly', 10, now + 2 * day, 'draft', 1, null, null);
-  insertRec.run('rec-cicilan', 'Cicilan Gadget (iPhone)', 'expense', 1250000, 'acc-bca', 'cat-tagihan', 'monthly', 25, now + 17 * day, 'draft', 0, 12, 5);
-
-  // 6. Seed Goals
-  const insertGoal = db.prepare(`
-    INSERT INTO goal (id, name, target_amount, saved_amount, due_at, account_id, auto_amount, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  insertGoal.run('goal-emergency', 'Dana Darurat 6 Bulan', 20000000, 14500000, now + 120 * day, 'acc-bca', 1000000, now, now);
-  insertGoal.run('goal-bali', 'Liburan Akhir Tahun Bali', 6000000, 3200000, now + 75 * day, 'acc-bca', 750000, now, now);
-
-  // 7. Seed Settings
+  // 5. Seed Settings
   const insertSet = db.prepare('INSERT INTO setting (key, value) VALUES (?, ?)');
   insertSet.run('currency', 'IDR');
   insertSet.run('start_day', '1');

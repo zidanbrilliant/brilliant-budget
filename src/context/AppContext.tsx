@@ -20,7 +20,7 @@ import {
 } from '../utils/mockData';
 import { api } from '../services/api';
 
-const STORAGE_KEY = 'CATAT_APP_STATE_V2';
+const STORAGE_KEY = 'CATAT_APP_STATE_V3';
 
 interface ToastAction {
   message: string;

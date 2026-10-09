@@ -34,10 +34,10 @@ export const BerandaView: React.FC = () => {
   } = useApp();
 
   const summary = getMonthSummary();
-  const totalBudget = budget.total_limit || 5500000;
-  const budgetSpentPercent = Math.min(100, Math.round((summary.expense / totalBudget) * 100));
-  const isBudgetWarning = budgetSpentPercent >= 80 && budgetSpentPercent < 100;
-  const isBudgetExceeded = budgetSpentPercent >= 100;
+  const totalBudget = budget.total_limit || 0;
+  const budgetSpentPercent = totalBudget > 0 ? Math.min(100, Math.round((summary.expense / totalBudget) * 100)) : 0;
+  const isBudgetWarning = totalBudget > 0 && budgetSpentPercent >= 80 && budgetSpentPercent < 100;
+  const isBudgetExceeded = totalBudget > 0 && budgetSpentPercent >= 100;
 
   const drafts = transactions.filter(t => t.status === 'draft' && !t.deleted_at);
   const confirmedTxns = transactions
@@ -333,50 +333,61 @@ export const BerandaView: React.FC = () => {
         </div>
 
         <div className="bg-white dark:bg-[#151E2E] rounded-xl divide-y divide-slate-100 dark:divide-slate-800/80 border border-slate-200/70 dark:border-slate-800 shadow-2xs overflow-hidden">
-          {confirmedTxns.map(t => {
-            const cat = getCategoryInfo(t.category_id);
-            const isExpense = t.type === 'expense';
-            const isIncome = t.type === 'income';
+          {confirmedTxns.length === 0 ? (
+            <div className="py-8 px-4 text-center space-y-1">
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Belum ada transaksi tercatat
+              </p>
+              <p className="text-[11px] text-slate-400">
+                Ketuk tombol Catat (+) di bawah untuk mulai mencatat pengeluaran Anda.
+              </p>
+            </div>
+          ) : (
+            confirmedTxns.map(t => {
+              const cat = getCategoryInfo(t.category_id);
+              const isExpense = t.type === 'expense';
+              const isIncome = t.type === 'income';
 
-            return (
-              <div key={t.id} className="p-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-white text-xs"
-                    style={{ backgroundColor: cat.color }}
-                  >
-                    <AppIcon name={cat.icon} className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                      {t.merchant || cat.name}
+              return (
+                <div key={t.id} className="p-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-white text-xs"
+                      style={{ backgroundColor: cat.color }}
+                    >
+                      <AppIcon name={cat.icon} className="w-4 h-4 text-white" />
                     </div>
-                    <div className="text-[11px] text-slate-400 truncate">
-                      {formatDateRelative(t.occurred_at)}
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                        {t.merchant || cat.name}
+                      </div>
+                      <div className="text-[11px] text-slate-400 truncate">
+                        {formatDateRelative(t.occurred_at)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <div
+                      className={`text-xs font-bold tabular-nums ${
+                        isIncome
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : isExpense
+                          ? 'text-slate-900 dark:text-slate-100'
+                          : 'text-blue-600 dark:text-blue-400'
+                      }`}
+                    >
+                      {isIncome ? '+' : isExpense ? '-' : ''}
+                      {formatIDR(t.amount)}
+                    </div>
+                    <div className="text-[10px] text-slate-400 capitalize">
+                      {t.type === 'transfer' ? 'Transfer' : getAccountInfo(t.account_id).name}
                     </div>
                   </div>
                 </div>
-
-                <div className="text-right shrink-0">
-                  <div
-                    className={`text-xs font-bold tabular-nums ${
-                      isIncome
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : isExpense
-                        ? 'text-slate-900 dark:text-slate-100'
-                        : 'text-blue-600 dark:text-blue-400'
-                    }`}
-                  >
-                    {isIncome ? '+' : isExpense ? '-' : ''}
-                    {formatIDR(t.amount)}
-                  </div>
-                  <div className="text-[10px] text-slate-400 capitalize">
-                    {t.type === 'transfer' ? 'Transfer' : getAccountInfo(t.account_id).name}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </section>
     </div>

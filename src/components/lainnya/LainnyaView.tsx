@@ -68,7 +68,7 @@ export const LainnyaView: React.FC = () => {
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [fromAcc, setFromAcc] = useState(accounts[0]?.id || '');
   const [toAcc, setToAcc] = useState(accounts[1]?.id || '');
-  const [transferAmount, setTransferAmount] = useState(100000);
+  const [transferAmount, setTransferAmount] = useState(0);
   const [transferFee, setTransferFee] = useState(0);
 
   // SMS Simulator (FR-22: App Intent ParseTransactionText)
