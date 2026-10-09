@@ -15,18 +15,21 @@ const AppContent: React.FC = () => {
   const { activeTab } = useApp();
 
   return (
-    <IOSFrame>
-      {activeTab === 'beranda' && <BerandaView />}
-      {activeTab === 'transaksi' && <TransaksiView />}
-      {activeTab === 'budget' && <BudgetView />}
-      {activeTab === 'lainnya' && <LainnyaView />}
+    <>
+      <IOSFrame>
+        {activeTab === 'beranda' && <BerandaView />}
+        {activeTab === 'transaksi' && <TransaksiView />}
+        {activeTab === 'budget' && <BudgetView />}
+        {activeTab === 'lainnya' && <LainnyaView />}
+      </IOSFrame>
 
+      {/* Global Modals & Navigation placed outside scroll container for iOS WebKit stability */}
       <TabBar />
       <CatatModal />
       <Toast />
       <LockScreen />
       <OnboardingModal />
-    </IOSFrame>
+    </>
   );
 };
 

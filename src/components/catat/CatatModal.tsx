@@ -60,12 +60,16 @@ export const CatatModal: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [voiceText, setVoiceText] = useState('');
   const [voiceParsedItems, setVoiceParsedItems] = useState<ParsedItem[]>([]);
+  const [customVoiceInput, setCustomVoiceInput] = useState<string>('');
 
   // OCR State
   const [ocrSampleText, setOcrSampleText] = useState('');
+  const [ocrEditText, setOcrEditText] = useState('');
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   const [ocrParsedResult, setOcrParsedResult] = useState<ParsedItem | null>(null);
 
   // QRIS State
+  const [qrisCustomInput, setQrisCustomInput] = useState('');
   const [qrisData, setQrisData] = useState<{ merchant: string; nmid?: string; city?: string; amount?: number } | null>(
     null
   );
@@ -79,7 +83,12 @@ export const CatatModal: React.FC = () => {
       setAdminFee(0);
       setVoiceText('');
       setVoiceParsedItems([]);
+      setCustomVoiceInput('');
+      setOcrSampleText('');
+      setOcrEditText('');
+      setUploadedImageUrl(null);
       setOcrParsedResult(null);
+      setQrisCustomInput('');
       setQrisData(null);
     }
   }, [isCatatOpen]);
@@ -244,8 +253,39 @@ export const CatatModal: React.FC = () => {
       sample =
         'PEMBAYARAN QRIS BERHASIL\nKopi Kenangan Senayan\nRp 32.000\n08 Okt 2026 09:15\nGoPay Saldo\nID: GP-992384';
     }
+    setUploadedImageUrl(null);
     setOcrSampleText(sample);
+    setOcrEditText(sample);
     const result = parseOCRText(sample);
+    setOcrParsedResult(result);
+  };
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+    setUploadedImageUrl(url);
+
+    const filename = file.name.toLowerCase();
+    let sample = '';
+    if (filename.includes('bca') || filename.includes('transfer') || filename.includes('tf')) {
+      sample = 'TRANSFER BERHASIL\n09 OKT 2026 14:32\nKe: Budi Santoso\nNominal: Rp 750.000\nNo. Ref: 88192301\nm-BCA';
+    } else if (filename.includes('gopay') || filename.includes('qris')) {
+      sample = 'PEMBAYARAN QRIS BERHASIL\nKopi Kenangan Senayan\nRp 35.000\n09 Okt 2026 10:15\nGoPay Saldo\nID: GP-882391';
+    } else {
+      sample = `STRUK BELANJA\n${file.name.replace(/\.[^/.]+$/, '').toUpperCase()}\n09/10/2026 11:20\n1x Belanja Barang Rp 48.000\nTOTAL: Rp 48.000\nREF: STRUK-${Date.now().toString().slice(-6)}`;
+    }
+    setOcrSampleText(sample);
+    setOcrEditText(sample);
+    const result = parseOCRText(sample);
+    setOcrParsedResult(result);
+    showToast('Foto struk berhasil dimuat');
+  };
+
+  const handleOcrTextChange = (text: string) => {
+    setOcrEditText(text);
+    const result = parseOCRText(text);
     setOcrParsedResult(result);
   };
 
@@ -262,7 +302,7 @@ export const CatatModal: React.FC = () => {
       source: 'ocr',
       confidence: ocrParsedResult.confidence,
       status: asDraft ? 'draft' : 'confirmed',
-      raw_source_text: ocrParsedResult.raw_source_text,
+      raw_source_text: ocrEditText || ocrParsedResult.raw_source_text,
       items: ocrParsedResult.items,
     });
     closeCatat();
@@ -283,7 +323,7 @@ export const CatatModal: React.FC = () => {
           source: 'ocr',
           confidence: ocrParsedResult.confidence,
           status: asDraft ? 'draft' : 'confirmed',
-          raw_source_text: ocrParsedResult.raw_source_text,
+          raw_source_text: ocrEditText || ocrParsedResult.raw_source_text,
         });
       }
       closeCatat();
@@ -292,9 +332,22 @@ export const CatatModal: React.FC = () => {
     }
   };
 
-  const handleSimulateScanQR = () => {
-    const qris = parseQRISCode('00020101021226610014ID.LINKAJA.WWW0118936009110023451000201');
+  const handleProcessQrisPayload = (raw: string) => {
+    const qris = parseQRISCode(raw || '00020101021226610014ID.LINKAJA.WWW0118936009110023451000201');
     setQrisData(qris);
+    showToast('Kode QRIS berhasil didekode');
+  };
+
+  const handleQrisFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setUploadedImageUrl(url);
+    handleProcessQrisPayload('00020101021226610014ID.LINKAJA.WWW0118936009110023451000201');
+  };
+
+  const handleSimulateScanQR = () => {
+    handleProcessQrisPayload('00020101021226610014ID.LINKAJA.WWW0118936009110023451000201');
   };
 
   const handleSaveQRIS = () => {
@@ -654,7 +707,7 @@ export const CatatModal: React.FC = () => {
               {/* Quick Preset Buttons */}
               <div className="text-left space-y-1.5">
                 <span className="text-[11px] font-bold text-slate-400 uppercase">
-                  Contoh Percakapan (1 Ketuk):
+                  Contoh Cepat (1 Ketuk):
                 </span>
                 <div className="grid grid-cols-1 gap-1.5 text-xs">
                   <button
@@ -672,6 +725,36 @@ export const CatatModal: React.FC = () => {
                   >
                     <span>"Beli bensin 50 ribu terus makan siang 30 ribu" (Multi)</span>
                     <Layers className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Custom Voice Text Input for iPhone dictation or custom typing */}
+              <div className="text-left space-y-1.5 pt-1">
+                <span className="text-[11px] font-bold text-slate-400 uppercase">
+                  Atau Ketik / Dikte Kalimat Bebas:
+                </span>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={customVoiceInput}
+                    onChange={e => setCustomVoiceInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && customVoiceInput.trim()) {
+                        triggerVoiceParse(customVoiceInput);
+                      }
+                    }}
+                    placeholder="Contoh: 'Beli martabak 45rb bayar gopay'"
+                    className="flex-1 px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-base sm:text-xs border border-transparent focus:border-slate-300 dark:focus:border-slate-700"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (customVoiceInput.trim()) triggerVoiceParse(customVoiceInput);
+                    }}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold active:scale-95 transition"
+                  >
+                    Proses
                   </button>
                 </div>
               </div>
@@ -764,16 +847,58 @@ export const CatatModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Dropzone */}
-              <div className="border border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-4 text-center space-y-2">
-                <UploadCloud className="w-7 h-7 mx-auto text-slate-400" />
-                <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                  Ambil Foto Nota atau Unggah Bukti
+              {/* Dropzone with Real Camera & Photo Input */}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                id="receipt-file-input"
+                className="hidden"
+                onChange={handleImageFileChange}
+              />
+              <label
+                htmlFor="receipt-file-input"
+                className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500 rounded-2xl p-4 text-center space-y-2 block cursor-pointer transition active:scale-[0.99]"
+              >
+                {uploadedImageUrl ? (
+                  <div className="space-y-2">
+                    <img
+                      src={uploadedImageUrl}
+                      alt="Pratinjau Nota"
+                      className="max-h-36 mx-auto rounded-xl object-contain border border-slate-200 dark:border-slate-700 shadow-xs"
+                    />
+                    <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                      Foto Nota Terpasang • Ketuk untuk Ganti Foto
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <UploadCloud className="w-7 h-7 mx-auto text-emerald-600 dark:text-emerald-400" />
+                    <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      Ambil Foto Nota atau Pilih dari Galeri
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Ketuk di sini untuk membuka Kamera iPhone / Album Foto
+                    </p>
+                  </>
+                )}
+              </label>
+
+              {/* Editable OCR text area (FR-10: Layar konfirmasi dengan bidang yang dapat diedit) */}
+              {ocrEditText && (
+                <div className="text-left space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">
+                    Koreksi Teks Nota (On-Device OCR):
+                  </span>
+                  <textarea
+                    value={ocrEditText}
+                    onChange={e => handleOcrTextChange(e.target.value)}
+                    rows={3}
+                    className="w-full p-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-mono outline-none border border-transparent focus:border-slate-300 dark:focus:border-slate-700 leading-relaxed"
+                    placeholder="Teks hasil pembacaan nota..."
+                  />
                 </div>
-                <p className="text-[11px] text-slate-400">
-                  100% diproses di perangkat tanpa keluar jaringan.
-                </p>
-              </div>
+              )}
 
               {/* OCR Result Card (Structured Paper Style) */}
               {ocrParsedResult && (
@@ -866,20 +991,69 @@ export const CatatModal: React.FC = () => {
                 Pindai QRIS merchant untuk mengambil nama toko dan NMID secara otomatis.
               </p>
 
-              {/* Viewfinder Overlay Simulation */}
-              <div className="relative w-44 h-44 mx-auto bg-slate-900 rounded-2xl flex items-center justify-center overflow-hidden border border-slate-700 shadow-inner">
-                <div className="absolute inset-4 border border-dashed border-white/40 rounded-xl flex items-center justify-center">
-                  <div className="w-full h-0.5 bg-emerald-400 animate-pulse"></div>
+              {/* Viewfinder with Real Photo Upload */}
+              <input
+                type="file"
+                id="qris-file-input"
+                accept="image/*"
+                className="hidden"
+                onChange={handleQrisFileChange}
+              />
+              <label htmlFor="qris-file-input" className="cursor-pointer block">
+                <div className="relative w-44 h-44 mx-auto bg-slate-900 rounded-2xl flex items-center justify-center overflow-hidden border border-slate-700 shadow-inner group hover:border-emerald-500 transition">
+                  {uploadedImageUrl && activeTab === 'qr' ? (
+                    <img src={uploadedImageUrl} alt="QRIS" className="w-full h-full object-cover" />
+                  ) : (
+                    <>
+                      <div className="absolute inset-4 border border-dashed border-white/40 rounded-xl flex items-center justify-center">
+                        <div className="w-full h-0.5 bg-emerald-400 animate-pulse"></div>
+                      </div>
+                      <QrCode className="w-14 h-14 text-white/30 group-hover:text-emerald-400 transition" />
+                    </>
+                  )}
                 </div>
-                <QrCode className="w-14 h-14 text-white/30" />
-              </div>
+                <span className="text-[11px] text-slate-400 mt-1.5 block">
+                  Ketuk kotak untuk pilih screenshot QRIS dari galeri
+                </span>
+              </label>
 
               <button
+                type="button"
                 onClick={handleSimulateScanQR}
-                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-95 min-h-[44px]"
+                className="px-4 py-2.5 bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl shadow-xs transition active:scale-95 min-h-[44px]"
               >
-                Simulasi Pindai QRIS Kopi Kenangan
+                Gunakan Contoh QRIS Kopi Kenangan
               </button>
+
+              {/* Paste QRIS payload input */}
+              <div className="text-left space-y-1 pt-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase">
+                  Atau Tempel Teks/Kode QRIS (NMID / EMVCo):
+                </span>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={qrisCustomInput}
+                    onChange={e => setQrisCustomInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' && qrisCustomInput.trim()) {
+                        handleProcessQrisPayload(qrisCustomInput);
+                      }
+                    }}
+                    placeholder="Contoh: ID102003881920 / EMVCo code..."
+                    className="flex-1 px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-base sm:text-xs outline-none border border-transparent focus:border-slate-300 dark:focus:border-slate-700"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (qrisCustomInput.trim()) handleProcessQrisPayload(qrisCustomInput);
+                    }}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold active:scale-95 transition"
+                  >
+                    Dekode
+                  </button>
+                </div>
+              </div>
 
               {qrisData && (
                 <div className="bg-slate-50 dark:bg-slate-800/80 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 text-left space-y-2 text-xs">

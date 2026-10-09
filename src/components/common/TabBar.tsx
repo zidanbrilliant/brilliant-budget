@@ -4,31 +4,8 @@ import { Home, ListFilter, Plus, PieChart, MoreHorizontal } from 'lucide-react';
 
 export const TabBar: React.FC = () => {
   const { activeTab, setActiveTab, openCatat, transactions } = useApp();
-  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const draftCount = transactions.filter(t => t.status === 'draft' && !t.deleted_at).length;
-
-  const handlePointerDown = () => {
-    holdTimerRef.current = setTimeout(() => {
-      openCatat('voice');
-      holdTimerRef.current = null;
-    }, 450);
-  };
-
-  const handlePointerUp = () => {
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-      openCatat('manual');
-    }
-  };
-
-  const handlePointerLeave = () => {
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-  };
 
   return (
     <div className="fixed bottom-0 inset-x-0 z-40 flex justify-center pointer-events-none">
@@ -73,11 +50,9 @@ export const TabBar: React.FC = () => {
           {/* Center Action Button: + Catat */}
           <div className="relative -top-3 flex flex-col items-center">
             <button
-              onPointerDown={handlePointerDown}
-              onPointerUp={handlePointerUp}
-              onPointerLeave={handlePointerLeave}
+              onClick={() => openCatat('manual')}
               className="w-12 h-12 rounded-full bg-emerald-600 hover:bg-emerald-500 active:scale-90 text-white shadow-md shadow-emerald-600/25 flex items-center justify-center transition-all ring-4 ring-white dark:ring-[#0B0F19]"
-              title="Ketuk untuk catat manual, tahan untuk suara"
+              title="Catat Transaksi Cepat"
               aria-label="Catat Transaksi"
             >
               <Plus className="w-6 h-6 stroke-[2.5]" />

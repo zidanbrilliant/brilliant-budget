@@ -15,9 +15,11 @@ export const BudgetView: React.FC = () => {
     budget,
     updateBudget,
     categories,
+    accounts,
     getMonthSummary,
     getCategorySpending,
     recurring,
+    addRecurring,
     goals,
     contributeToGoal,
     addGoal,
@@ -32,6 +34,16 @@ export const BudgetView: React.FC = () => {
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [goalName, setGoalName] = useState('');
   const [goalTarget, setGoalTarget] = useState(5000000);
+
+  // New Recurring modal state
+  const [isAddRecurringOpen, setIsAddRecurringOpen] = useState(false);
+  const [recName, setRecName] = useState('');
+  const [recAmount, setRecAmount] = useState(150000);
+  const [recDay, setRecDay] = useState(1);
+  const [recIsSub, setRecIsSub] = useState(true);
+  const [recTenor, setRecTenor] = useState(12);
+  const [recAccount, setRecAccount] = useState('acc-bca');
+  const [recCategory, setRecCategory] = useState('cat-hiburan');
 
   // Summary
   const summary = getMonthSummary();
@@ -62,6 +74,27 @@ export const BudgetView: React.FC = () => {
     });
     setGoalName('');
     setIsGoalModalOpen(false);
+  };
+
+  const handleCreateRecurring = () => {
+    if (!recName.trim() || recAmount <= 0) return;
+    addRecurring({
+      name: recName.trim(),
+      type: 'expense',
+      amount: recAmount,
+      account_id: recAccount || accounts[0]?.id || 'acc-bca',
+      category_id: recCategory,
+      frequency: 'monthly',
+      day_of_month: recDay,
+      next_run_at: Date.now() + 30 * 86400000,
+      mode: 'auto',
+      is_active: true,
+      is_subscription: recIsSub,
+      total_tenor: recIsSub ? undefined : recTenor,
+      remaining_tenor: recIsSub ? undefined : recTenor,
+    });
+    setRecName('');
+    setIsAddRecurringOpen(false);
   };
 
   return (
@@ -287,9 +320,18 @@ export const BudgetView: React.FC = () => {
           </div>
 
           <div className="space-y-1.5">
-            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
-              Pengeluaran Terjadwal ({recurring.length})
-            </h3>
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                Pengeluaran Terjadwal ({recurring.length})
+              </h3>
+              <button
+                onClick={() => setIsAddRecurringOpen(true)}
+                className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950 px-2.5 py-1.5 rounded-lg transition active:scale-95"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Langganan</span>
+              </button>
+            </div>
 
             <div className="bg-white dark:bg-[#151E2E] rounded-2xl divide-y divide-slate-100 dark:divide-slate-800/80 border border-slate-200/80 dark:border-slate-800/80 shadow-xs overflow-hidden">
               {recurring.map(rule => {
@@ -528,6 +570,103 @@ export const BudgetView: React.FC = () => {
               <button
                 onClick={handleCreateGoal}
                 className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold"
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Recurring Modal */}
+      {isAddRecurringOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#151E2E] rounded-2xl p-5 max-w-sm w-full space-y-3.5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
+            <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+              Tambah Pengeluaran Rutin
+            </h3>
+            <div className="space-y-2.5 text-xs">
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nama Layanan</label>
+                <input
+                  type="text"
+                  value={recName}
+                  onChange={e => setRecName(e.target.value)}
+                  placeholder="Mis. Spotify, iCloud, BPJS"
+                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nominal (Rp)</label>
+                <input
+                  type="number"
+                  value={recAmount}
+                  onChange={e => setRecAmount(Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-bold tabular-nums"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Tanggal Tiap Bulan</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={recDay}
+                    onChange={e => setRecDay(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none tabular-nums"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Jenis</label>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setRecIsSub(true)}
+                      className={`flex-1 py-2 rounded-lg font-bold text-[11px] transition ${
+                        recIsSub ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                      }`}
+                    >
+                      Langganan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecIsSub(false)}
+                      className={`flex-1 py-2 rounded-lg font-bold text-[11px] transition ${
+                        !recIsSub ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                      }`}
+                    >
+                      Cicilan
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {!recIsSub && (
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Total Tenor (Bulan)</label>
+                  <input
+                    type="number"
+                    value={recTenor}
+                    onChange={e => setRecTenor(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none tabular-nums"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setIsAddRecurringOpen(false)}
+                className="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleCreateRecurring}
+                className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500"
               >
                 Simpan
               </button>

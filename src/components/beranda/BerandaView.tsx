@@ -154,7 +154,7 @@ export const BerandaView: React.FC = () => {
           </button>
 
           <button
-            onClick={() => openCatat('screenshot')}
+            onClick={() => openCatat('qr')}
             className="flex flex-col items-center justify-center py-2.5 px-1 bg-white dark:bg-[#151E2E] rounded-xl border border-slate-200/70 dark:border-slate-800 shadow-2xs hover:border-emerald-500 active:scale-95 transition"
           >
             <QrCode className="w-4 h-4 text-slate-700 dark:text-slate-300 mb-1" />
@@ -247,7 +247,8 @@ export const BerandaView: React.FC = () => {
             return (
               <div
                 key={acc.id}
-                className="min-w-[150px] p-3 rounded-xl bg-white dark:bg-[#151E2E] border border-slate-200/70 dark:border-slate-800 shadow-2xs snap-start flex flex-col justify-between h-24"
+                onClick={() => setActiveTab('lainnya')}
+                className="min-w-[150px] p-3 rounded-xl bg-white dark:bg-[#151E2E] border border-slate-200/70 dark:border-slate-800 shadow-2xs snap-start flex flex-col justify-between h-24 cursor-pointer hover:border-emerald-500 transition active:scale-95"
               >
                 <div className="flex items-center justify-between">
                   <div
