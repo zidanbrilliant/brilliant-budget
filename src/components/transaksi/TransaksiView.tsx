@@ -121,7 +121,7 @@ export const TransaksiView: React.FC = () => {
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
           placeholder="Cari transaksi, toko, nominal..."
-          className="w-full pl-9 pr-8 py-2 bg-slate-200/50 dark:bg-slate-800/80 rounded-xl text-xs border border-transparent focus:border-slate-300 dark:focus:border-slate-700 outline-none placeholder:text-slate-400 text-slate-800 dark:text-slate-100 transition"
+          className="w-full pl-9 pr-8 py-2 bg-slate-200/50 dark:bg-slate-800/80 rounded-xl text-base sm:text-xs border border-transparent focus:border-slate-300 dark:focus:border-slate-700 outline-none placeholder:text-slate-400 text-slate-800 dark:text-slate-100 transition"
         />
         {searchQuery && (
           <button

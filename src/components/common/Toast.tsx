@@ -8,7 +8,7 @@ export const Toast: React.FC = () => {
   if (!toast) return null;
 
   return (
-    <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-sm animate-scale-up">
+    <div className="fixed bottom-safe-toast left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-sm animate-scale-up pointer-events-auto">
       <div className="bg-[#0F172A]/95 dark:bg-[#1E293B]/95 backdrop-blur-md text-white px-3.5 py-2.5 rounded-xl shadow-lg flex items-center justify-between border border-slate-700/50">
         <span className="text-xs font-medium leading-snug truncate pr-2">{toast.message}</span>
         <div className="flex items-center gap-2 flex-shrink-0">

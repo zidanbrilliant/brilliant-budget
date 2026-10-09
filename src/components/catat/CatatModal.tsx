@@ -567,7 +567,7 @@ export const CatatModal: React.FC = () => {
                         value={merchant}
                         onChange={e => handleMerchantChange(e.target.value)}
                         placeholder="Toko / Merchant"
-                        className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg outline-none border border-transparent focus:border-slate-300 dark:focus:border-slate-700"
+                        className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg outline-none border border-transparent focus:border-slate-300 dark:focus:border-slate-700 text-base sm:text-xs"
                       />
                     </div>
                     <div>
@@ -576,7 +576,7 @@ export const CatatModal: React.FC = () => {
                         value={note}
                         onChange={e => setNote(e.target.value)}
                         placeholder="Catatan (opsional)"
-                        className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg outline-none border border-transparent focus:border-slate-300 dark:focus:border-slate-700"
+                        className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg outline-none border border-transparent focus:border-slate-300 dark:focus:border-slate-700 text-base sm:text-xs"
                       />
                     </div>
                   </div>
@@ -609,16 +609,16 @@ export const CatatModal: React.FC = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-2 pt-1">
+              <div className="flex gap-2 pt-1 pb-safe-bottom">
                 <button
                   onClick={() => handleSaveManual(true)}
-                  className="px-3.5 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-200 transition active:scale-95"
+                  className="px-3.5 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold hover:bg-slate-200 transition active:scale-95 min-h-[44px]"
                 >
                   + Tambah Lagi
                 </button>
                 <button
                   onClick={() => handleSaveManual(false)}
-                  className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition active:scale-95 flex items-center justify-center gap-1.5"
+                  className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition active:scale-95 flex items-center justify-center gap-1.5 min-h-[44px]"
                 >
                   <Check className="w-4 h-4 stroke-[2.5]" />
                   <span>Simpan Transaksi</span>
@@ -711,16 +711,16 @@ export const CatatModal: React.FC = () => {
                     );
                   })}
 
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex gap-2 pt-2 pb-safe-bottom">
                     <button
                       onClick={() => handleSaveVoiceItems(true)}
-                      className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold"
+                      className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold min-h-[44px] active:scale-95 transition"
                     >
                       Simpan sbg Draft
                     </button>
                     <button
                       onClick={() => handleSaveVoiceItems(false)}
-                      className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold"
+                      className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-xs font-bold min-h-[44px] active:scale-95 transition shadow-sm"
                     >
                       Konfirmasi Simpan
                     </button>
@@ -832,23 +832,23 @@ export const CatatModal: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="flex gap-2 pt-1">
+                  <div className="flex gap-2 pt-1 pb-safe-bottom">
                     <button
                       onClick={() => handleSaveOCR(true)}
-                      className="px-3 py-2.5 rounded-xl bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold"
+                      className="px-3.5 py-3 rounded-xl bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold min-h-[44px] active:scale-95 transition"
                     >
                       Draft
                     </button>
                     <button
                       onClick={() => handleSaveOCR(false)}
-                      className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 font-bold"
+                      className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 font-bold min-h-[44px] active:scale-95 transition"
                     >
                       Simpan Total
                     </button>
                     {ocrParsedResult.items && ocrParsedResult.items.length > 0 && (
                       <button
                         onClick={() => handleSaveOCRSplit(false)}
-                        className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                        className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold min-h-[44px] active:scale-95 transition shadow-sm"
                       >
                         Pecah Kategori
                       </button>
@@ -876,7 +876,7 @@ export const CatatModal: React.FC = () => {
 
               <button
                 onClick={handleSimulateScanQR}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-xs transition"
+                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-95 min-h-[44px]"
               >
                 Simulasi Pindai QRIS Kopi Kenangan
               </button>
@@ -895,10 +895,10 @@ export const CatatModal: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="pt-1">
+                  <div className="pt-1 pb-safe-bottom">
                     <button
                       onClick={handleSaveQRIS}
-                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl"
+                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl min-h-[44px] active:scale-95 transition shadow-sm"
                     >
                       Konfirmasi Simpan
                     </button>

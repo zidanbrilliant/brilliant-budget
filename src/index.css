@@ -3,11 +3,17 @@
 @tailwind utilities;
 
 @layer utilities {
-  .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom, 1rem);
+  .pt-safe-top {
+    padding-top: max(env(safe-area-inset-top, 0px), 0.75rem);
   }
-  .pt-safe {
-    padding-top: env(safe-area-inset-top, 1rem);
+  .pb-safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 1.25rem);
+  }
+  .pb-tabbar-clearance {
+    padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
+  }
+  .bottom-safe-toast {
+    bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
   }
   .scrollbar-none::-webkit-scrollbar {
     display: none;
@@ -21,9 +27,20 @@
   }
 }
 
-/* iOS-style tactile press */
+/* iOS WebKit: Prevent automatic viewport zoom on input focus */
+@media screen and (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* iOS-style tactile press & momentum scrolling */
 .tap-highlight-none {
   -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  -webkit-overflow-scrolling: touch;
 }
 
 @keyframes slideUp {

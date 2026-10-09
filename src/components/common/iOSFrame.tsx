@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { ShieldCheck, Moon, Sun, Lock, Layers } from 'lucide-react';
+import { Moon, Sun, Lock, Layers } from 'lucide-react';
 import { WidgetPreviewModal } from './WidgetPreviewModal';
 
 interface IOSFrameProps {
@@ -15,8 +15,8 @@ export const IOSFrame: React.FC<IOSFrameProps> = ({ children }) => {
     <div className="min-h-screen bg-slate-50 dark:bg-[#060910] text-slate-900 dark:text-slate-100 flex justify-center antialiased">
       {/* Centered Mobile-First App Container */}
       <div className="w-full max-w-md min-h-screen bg-white dark:bg-[#0B0F19] border-x border-slate-200/60 dark:border-slate-800/60 flex flex-col relative shadow-xs">
-        {/* Clean Application Top Bar */}
-        <header className="sticky top-0 z-30 bg-white/90 dark:bg-[#0B0F19]/90 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80">
+        {/* Clean Application Top Bar with Safe Area Clearance */}
+        <header className="sticky top-0 z-30 bg-white/95 dark:bg-[#0B0F19]/95 backdrop-blur-md px-4 pb-2.5 pt-safe-top flex items-center justify-between border-b border-slate-100 dark:border-slate-800/80 transition-all">
           <div className="flex items-center gap-2">
             <span className="font-extrabold text-base tracking-tight text-slate-900 dark:text-white">
               Brilliant Budget
@@ -27,11 +27,11 @@ export const IOSFrame: React.FC<IOSFrameProps> = ({ children }) => {
             </span>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
             {/* Widget Simulator */}
             <button
               onClick={() => setIsWidgetModalOpen(true)}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition active:scale-95"
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition active:scale-95"
               title="Widget iOS (PRD 7.4)"
               aria-label="Simulasi Widget"
             >
@@ -41,7 +41,7 @@ export const IOSFrame: React.FC<IOSFrameProps> = ({ children }) => {
             {/* Lock App */}
             <button
               onClick={() => setIsLocked(true)}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition active:scale-95"
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition active:scale-95"
               title="Kunci Aplikasi"
               aria-label="Kunci Aplikasi"
             >
@@ -53,7 +53,7 @@ export const IOSFrame: React.FC<IOSFrameProps> = ({ children }) => {
               onClick={() =>
                 updateSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })
               }
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition active:scale-95"
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition active:scale-95"
               title="Ganti Tema"
               aria-label="Ganti Tema"
             >
@@ -66,8 +66,8 @@ export const IOSFrame: React.FC<IOSFrameProps> = ({ children }) => {
           </div>
         </header>
 
-        {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col pb-24">
+        {/* Main Content Area with Bottom Clearance for TabBar */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col pb-tabbar-clearance">
           {children}
         </main>
       </div>

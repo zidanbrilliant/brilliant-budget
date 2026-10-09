@@ -35,11 +35,11 @@ export const LockScreen: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0B0F19]/95 backdrop-blur-xl flex flex-col items-center justify-between p-6 text-white select-none animate-scale-up">
-      <div className="w-full flex justify-center pt-6">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 bg-slate-800/80 px-3 py-1 rounded-full border border-slate-700/60 shadow-xs">
+    <div className="fixed inset-0 z-50 bg-[#0B0F19]/95 backdrop-blur-xl flex flex-col items-center justify-between px-6 py-4 text-white select-none animate-scale-up">
+      <div className="w-full flex justify-center pt-safe-top">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 bg-slate-800/80 px-3.5 py-1.5 rounded-full border border-slate-700/60 shadow-xs">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Aplikasi Terkunci</span>
+          <span>Brilliant Budget Terkunci</span>
         </div>
       </div>
 
@@ -76,8 +76,8 @@ export const LockScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Keypad */}
-      <div className="w-full max-w-xs grid grid-cols-3 gap-3 pb-6 place-items-center">
+      {/* Keypad with Bottom Safe Area Clearance */}
+      <div className="w-full max-w-xs grid grid-cols-3 gap-3 pb-safe-bottom place-items-center">
         {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'FaceID', '0', '⌫'].map(key => {
           if (key === 'FaceID') {
             return (
