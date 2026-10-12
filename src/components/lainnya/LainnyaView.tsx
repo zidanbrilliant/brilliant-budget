@@ -444,7 +444,7 @@ export const LainnyaView: React.FC = () => {
             <div className="text-center pt-2 pb-4 space-y-1">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Brilliant Budget v0.2.0</span>
+                <span>Brilliant Budget v0.2.1</span>
                 <span className="text-slate-300 dark:text-slate-600">·</span>
                 <span>Build 20261012</span>
               </div>
