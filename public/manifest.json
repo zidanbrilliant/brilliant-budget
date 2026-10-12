@@ -1,10 +1,12 @@
 {
   "name": "Brilliant Budget — Keuangan Cerdas",
   "short_name": "Brilliant",
+  "description": "Aplikasi pencatat keuangan offline-first hemat kuota & aman",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#09090B",
-  "theme_color": "#059669",
+  "orientation": "portrait",
+  "background_color": "#FFF1F2",
+  "theme_color": "#FB7185",
   "icons": [
     {
       "src": "/icon.svg",

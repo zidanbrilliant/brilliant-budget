@@ -43,15 +43,17 @@ jobs:
 
       - name: Package Payload as IPA
         run: |
+          VERSION=$(node -p "require('./package.json').version")
           cd ios/App/build/Build/Products/Release-iphoneos
           mkdir -p Payload
           cp -r App.app Payload/
-          zip -r BrilliantBudget.ipa Payload
-          mv BrilliantBudget.ipa $GITHUB_WORKSPACE/
+          zip -r "BrilliantBudget-v${VERSION}.ipa" Payload
+          mv "BrilliantBudget-v${VERSION}.ipa" "$GITHUB_WORKSPACE/"
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Upload iOS IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: BrilliantBudget-iOS
-          path: BrilliantBudget.ipa
+          name: BrilliantBudget-v${{ env.APP_VERSION }}-iOS
+          path: BrilliantBudget-v*.ipa
           retention-days: 14

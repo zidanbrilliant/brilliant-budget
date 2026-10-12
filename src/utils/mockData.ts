@@ -97,8 +97,6 @@ export const INITIAL_SETTINGS: AppSettings = {
   start_day: 1,
   theme: 'pink',
   pin_enabled: false,
-  biometrics_enabled: true,
+  pin_hash: '3e6f586ebe5cc35fde9659de4ce0591799eb634bc82eec18492416e991be614a',
   onboarding_completed: true,
-  auto_confirm_trusted: false,
-  view_mode: 'ios_frame',
 };

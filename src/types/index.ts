@@ -127,9 +127,6 @@ export interface AppSettings {
   start_day: number;
   theme: 'pink' | 'light' | 'dark';
   pin_enabled: boolean;
-  pin_code?: string;
-  biometrics_enabled: boolean;
+  pin_hash?: string;
   onboarding_completed: boolean;
-  auto_confirm_trusted: boolean;
-  view_mode: 'ios_frame' | 'responsive';
 }

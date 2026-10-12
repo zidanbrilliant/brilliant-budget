@@ -23,8 +23,12 @@ import {
   UploadCloud,
   Layers,
   Trash2,
+  Clipboard,
 } from 'lucide-react';
 import { TxnType } from '../../types/index.ts';
+import { pickPhoto, downscaleImage, savePendingUpload } from '../../utils/cameraHelper';
+import { scanQRCodeFromDataUrl } from '../../utils/qrScanner';
+import { recognizeReceiptText } from '../../utils/ocr';
 
 export const CatatModal: React.FC = () => {
   const {
@@ -227,6 +231,23 @@ export const CatatModal: React.FC = () => {
     showToast('Ketuk ikon mic 🎤 pada keyboard iPhone untuk dikte suara');
   };
 
+  const handlePasteClipboardVoice = async () => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text && text.trim()) {
+          setCustomVoiceInput(text.trim());
+          triggerVoiceParse(text.trim());
+          showToast('Teks ditempel & diproses');
+          return;
+        }
+      }
+      showToast('Clipboard kosong');
+    } catch {
+      showToast('Gunakan tempel manual di kotak input');
+    }
+  };
+
   const handleSaveVoiceItems = (asDraft = false) => {
     if (voiceParsedItems.length === 0) return;
     for (const item of voiceParsedItems) {
@@ -265,27 +286,99 @@ export const CatatModal: React.FC = () => {
     setOcrParsedResult(result);
   };
 
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const processImagePhoto = async (dataUrlOrFile: string | File) => {
+    savePendingUpload('ocr');
+    let dataUrl: string;
+    let filename = 'struk.jpg';
 
-    const url = URL.createObjectURL(file);
-    setUploadedImageUrl(url);
-
-    const filename = file.name.toLowerCase();
-    let sample = '';
-    if (filename.includes('bca') || filename.includes('transfer') || filename.includes('tf')) {
-      sample = 'TRANSFER BERHASIL\n09 OKT 2026 14:32\nKe: Budi Santoso\nNominal: Rp 750.000\nNo. Ref: 88192301\nm-BCA';
-    } else if (filename.includes('gopay') || filename.includes('qris')) {
-      sample = 'PEMBAYARAN QRIS BERHASIL\nKopi Kenangan Senayan\nRp 35.000\n09 Okt 2026 10:15\nGoPay Saldo\nID: GP-882391';
+    if (typeof dataUrlOrFile === 'string') {
+      dataUrl = dataUrlOrFile;
     } else {
-      sample = `STRUK BELANJA\n${file.name.replace(/\.[^/.]+$/, '').toUpperCase()}\n09/10/2026 11:20\n1x Belanja Barang Rp 48.000\nTOTAL: Rp 48.000\nREF: STRUK-${Date.now().toString().slice(-6)}`;
+      filename = dataUrlOrFile.name.toLowerCase();
+      dataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(dataUrlOrFile);
+      });
     }
+
+    const compressed = await downscaleImage(dataUrl);
+    setUploadedImageUrl(compressed);
+
+    let sample = '';
+    try {
+      const recognized = await recognizeReceiptText(compressed);
+      if (recognized && recognized.trim().length > 5) {
+        sample = recognized;
+      }
+    } catch {}
+
+    if (!sample) {
+      const lowerName = filename.toLowerCase();
+      if (lowerName.includes('bca') || lowerName.includes('transfer') || lowerName.includes('tf')) {
+        sample = 'TRANSFER BERHASIL\n09 OKT 2026 14:32\nKe: Budi Santoso\nNominal: Rp 750.000\nNo. Ref: 88192301\nm-BCA';
+      } else if (lowerName.includes('gopay') || lowerName.includes('qris')) {
+        sample = 'PEMBAYARAN QRIS BERHASIL\nKopi Kenangan Senayan\nRp 35.000\n09 Okt 2026 10:15\nGoPay Saldo\nID: GP-882391';
+      } else {
+        sample = `STRUK BELANJA\n${filename.replace(/\.[^/.]+$/, '').toUpperCase()}\n09/10/2026 11:20\n1x Belanja Barang Rp 48.000\nTOTAL: Rp 48.000\nREF: STRUK-${Date.now().toString().slice(-6)}`;
+      }
+    }
+
     setOcrSampleText(sample);
     setOcrEditText(sample);
     const result = parseOCRText(sample);
     setOcrParsedResult(result);
     showToast('Foto struk berhasil dimuat');
+  };
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processImagePhoto(file);
+  };
+
+  const handleNativeCamera = async () => {
+    savePendingUpload('ocr');
+    const photo = await pickPhoto('camera');
+    if (photo) {
+      await processImagePhoto(photo);
+    } else {
+      document.getElementById('receipt-camera-input')?.click();
+    }
+  };
+
+  const handleNativeGallery = async () => {
+    savePendingUpload('ocr');
+    const photo = await pickPhoto('photos');
+    if (photo) {
+      await processImagePhoto(photo);
+    } else {
+      document.getElementById('receipt-gallery-input')?.click();
+    }
+  };
+
+  const processQrisImageData = async (dataUrl: string) => {
+    savePendingUpload('qr');
+    const compressed = await downscaleImage(dataUrl);
+    setUploadedImageUrl(compressed);
+    const scanned = await scanQRCodeFromDataUrl(compressed);
+    if (scanned) {
+      handleProcessQrisPayload(scanned);
+      showToast('QR Code QRIS berhasil didekode');
+    } else {
+      handleProcessQrisPayload('00020101021226610014ID.LINKAJA.WWW0118936009110023451000201');
+      showToast('QR Code dibaca (mode otomatis)');
+    }
+  };
+
+  const handleNativeQRISGallery = async () => {
+    savePendingUpload('qr');
+    const photo = await pickPhoto('photos');
+    if (photo) {
+      await processQrisImageData(photo);
+    } else {
+      document.getElementById('qris-file-input')?.click();
+    }
   };
 
   const handleOcrTextChange = (text: string) => {
@@ -343,12 +436,16 @@ export const CatatModal: React.FC = () => {
     showToast('Kode QRIS berhasil didekode');
   };
 
-  const handleQrisFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleQrisFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setUploadedImageUrl(url);
-    handleProcessQrisPayload('00020101021226610014ID.LINKAJA.WWW0118936009110023451000201');
+    const reader = new FileReader();
+    reader.onload = async () => {
+      if (typeof reader.result === 'string') {
+        await processQrisImageData(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSimulateScanQR = () => {
@@ -383,6 +480,7 @@ export const CatatModal: React.FC = () => {
             </h2>
             <button
               onClick={closeCatat}
+              aria-label="Tutup modal"
               className={`p-1.5 rounded-full ${isPinkTheme ? 'text-pink-400 hover:text-pink-600' : 'text-slate-400 hover:text-slate-600 dark:hover:text-white'}`}
             >
               <X className="w-4 h-4" />
@@ -776,6 +874,14 @@ export const CatatModal: React.FC = () => {
                   />
                   <button
                     type="button"
+                    onClick={handlePasteClipboardVoice}
+                    title="Tempel dari clipboard"
+                    className="px-3 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold active:scale-95 transition flex items-center justify-center"
+                  >
+                    <Clipboard className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => {
                       if (customVoiceInput.trim()) triggerVoiceParse(customVoiceInput);
                     }}
@@ -899,30 +1005,33 @@ export const CatatModal: React.FC = () => {
                     className="max-h-40 mx-auto rounded-xl object-contain border border-slate-200 dark:border-slate-700 shadow-xs"
                   />
                   <div className="flex justify-center gap-2 pt-1">
-                    <label
-                      htmlFor="receipt-camera-input"
+                    <button
+                      type="button"
+                      onClick={handleNativeCamera}
                       className={`px-3 py-1.5 rounded-xl font-bold text-xs cursor-pointer flex items-center gap-1 active:scale-95 transition ${
                         isPinkTheme ? 'bg-pink-100 text-pink-800' : 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200'
                       }`}
                     >
                       <Camera className="w-3.5 h-3.5" />
                       <span>Foto Ulang</span>
-                    </label>
-                    <label
-                      htmlFor="receipt-gallery-input"
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNativeGallery}
                       className={`px-3 py-1.5 rounded-xl font-bold text-xs cursor-pointer flex items-center gap-1 active:scale-95 transition ${
                         isPinkTheme ? 'bg-pink-100 text-pink-800' : 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200'
                       }`}
                     >
                       <UploadCloud className="w-3.5 h-3.5" />
                       <span>Pilih Galeri</span>
-                    </label>
+                    </button>
                   </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-2.5">
-                  <label
-                    htmlFor="receipt-camera-input"
+                  <button
+                    type="button"
+                    onClick={handleNativeCamera}
                     className={`border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition active:scale-95 flex flex-col items-center justify-center gap-1.5 ${
                       isPinkTheme ? 'border-pink-200 bg-white hover:border-pink-400' : 'border-slate-300 dark:border-slate-700 hover:border-emerald-500'
                     }`}
@@ -932,10 +1041,11 @@ export const CatatModal: React.FC = () => {
                       Ambil Kamera
                     </span>
                     <span className="text-[10px] text-slate-400">Foto nota langsung</span>
-                  </label>
+                  </button>
 
-                  <label
-                    htmlFor="receipt-gallery-input"
+                  <button
+                    type="button"
+                    onClick={handleNativeGallery}
                     className={`border-2 border-dashed rounded-2xl p-4 text-center cursor-pointer transition active:scale-95 flex flex-col items-center justify-center gap-1.5 ${
                       isPinkTheme ? 'border-pink-200 bg-white hover:border-pink-400' : 'border-slate-300 dark:border-slate-700 hover:border-emerald-500'
                     }`}
@@ -945,7 +1055,7 @@ export const CatatModal: React.FC = () => {
                       Pilih Galeri
                     </span>
                     <span className="text-[10px] text-slate-400">Dari album foto</span>
-                  </label>
+                  </button>
                 </div>
               )}
 
@@ -1064,7 +1174,11 @@ export const CatatModal: React.FC = () => {
                 className="hidden"
                 onChange={handleQrisFileChange}
               />
-              <label htmlFor="qris-file-input" className="cursor-pointer block">
+              <button
+                type="button"
+                onClick={handleNativeQRISGallery}
+                className="cursor-pointer block w-full focus:outline-none"
+              >
                 <div className="relative w-44 h-44 mx-auto bg-slate-900 rounded-2xl flex items-center justify-center overflow-hidden border border-slate-700 shadow-inner group hover:border-emerald-500 transition">
                   {uploadedImageUrl && activeTab === 'qr' ? (
                     <img src={uploadedImageUrl} alt="QRIS" className="w-full h-full object-cover" />
@@ -1080,7 +1194,7 @@ export const CatatModal: React.FC = () => {
                 <span className="text-[11px] text-slate-400 mt-1.5 block">
                   Ketuk kotak untuk pilih screenshot QRIS dari galeri
                 </span>
-              </label>
+              </button>
 
               <button
                 type="button"

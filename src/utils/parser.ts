@@ -32,12 +32,6 @@ export function parseIndonesianAmount(text: string): number | null {
     if (!isNaN(num)) return Math.round(num * 1000);
   }
 
-  // Kata dasar angka Indonesia (e.g. "dua puluh lima ribu", "tiga puluh lima ribu")
-  const wordMap: Record<string, number> = {
-    nol: 0, satu: 1, dua: 2, tiga: 3, empat: 4, lima: 5, enam: 6, tujuh: 7, delapan: 8, sembilan: 9, sepuluh: 10,
-    sebelas: 11, 'dua belas': 12, 'tiga belas': 13, 'empat belas': 14, 'lima belas': 15
-  };
-
   // Standar currency regex: "Rp 125.000", "125.000", "50000"
   const numMatches = clean.match(/(?:rp\.?|idr)?\s*(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+)/i);
   if (numMatches) {

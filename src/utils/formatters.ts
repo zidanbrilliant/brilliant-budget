@@ -7,39 +7,24 @@ export function formatIDR(amount: number): string {
   }).format(Math.round(amount));
 }
 
+const compactFormatter = new Intl.NumberFormat('id-ID', { notation: 'compact', maximumFractionDigits: 1 });
+
 export function formatCompactIDR(amount: number): string {
-  if (Math.abs(amount) >= 1_000_000_000) {
-    return (amount / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + ' M';
-  }
-  if (Math.abs(amount) >= 1_000_000) {
-    return (amount / 1_000_000).toFixed(1).replace(/\.0$/, '') + ' jt';
-  }
-  if (Math.abs(amount) >= 1_000) {
-    return (amount / 1_000).toFixed(0) + ' rb';
-  }
-  return formatIDR(amount);
+  return compactFormatter.format(Math.round(amount));
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getDate() === b.getDate() && a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
 }
 
 export function formatDateRelative(timestamp: number): string {
   const date = new Date(timestamp);
   const now = new Date();
-  
-  const isToday =
-    date.getDate() === now.getDate() &&
-    date.getMonth() === now.getMonth() &&
-    date.getFullYear() === now.getFullYear();
-
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const isYesterday =
-    date.getDate() === yesterday.getDate() &&
-    date.getMonth() === yesterday.getMonth() &&
-    date.getFullYear() === yesterday.getFullYear();
-
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
   const timeStr = date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
 
-  if (isToday) return `Hari ini, ${timeStr}`;
-  if (isYesterday) return `Kemarin, ${timeStr}`;
+  if (isSameDay(date, now)) return `Hari ini, ${timeStr}`;
+  if (isSameDay(date, yesterday)) return `Kemarin, ${timeStr}`;
 
   return date.toLocaleDateString('id-ID', {
     day: 'numeric',
@@ -51,21 +36,10 @@ export function formatDateRelative(timestamp: number): string {
 export function formatDateHeading(timestamp: number): string {
   const date = new Date(timestamp);
   const now = new Date();
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
 
-  const isToday =
-    date.getDate() === now.getDate() &&
-    date.getMonth() === now.getMonth() &&
-    date.getFullYear() === now.getFullYear();
-
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const isYesterday =
-    date.getDate() === yesterday.getDate() &&
-    date.getMonth() === yesterday.getMonth() &&
-    date.getFullYear() === yesterday.getFullYear();
-
-  if (isToday) return 'Hari Ini';
-  if (isYesterday) return 'Kemarin';
+  if (isSameDay(date, now)) return 'Hari Ini';
+  if (isSameDay(date, yesterday)) return 'Kemarin';
 
   return date.toLocaleDateString('id-ID', {
     weekday: 'long',

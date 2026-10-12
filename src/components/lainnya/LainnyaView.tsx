@@ -20,6 +20,7 @@ import {
   X,
   Edit2,
   Trash2,
+  Clipboard,
 } from 'lucide-react';
 import { parseOCRText } from '../../utils/parser';
 import { Category } from '../../types/index.ts';
@@ -172,6 +173,22 @@ export const LainnyaView: React.FC = () => {
       raw_source_text: smsInput,
     });
     showToast('SMS diproses → Masuk Inbox Draft');
+  };
+
+  const handlePasteClipboardSMS = async () => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text && text.trim()) {
+          setSmsInput(text.trim());
+          showToast('Teks SMS ditempel dari clipboard');
+          return;
+        }
+      }
+      showToast('Clipboard kosong atau belum diizinkan');
+    } catch {
+      showToast('Gunakan tempel manual di kotak teks');
+    }
   };
 
   return (
@@ -421,6 +438,19 @@ export const LainnyaView: React.FC = () => {
                   Reset Pabrik
                 </button>
               </div>
+            </div>
+
+            {/* App Version Info Badge */}
+            <div className="text-center pt-2 pb-4 space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Brilliant Budget v0.2.0</span>
+                <span className="text-slate-300 dark:text-slate-600">·</span>
+                <span>Build 20261012</span>
+              </div>
+              <p className="text-[10px] text-slate-400">
+                100% Offline-First SQLite · PWA & iOS Ready
+              </p>
             </div>
           </div>
         </div>
@@ -683,13 +713,24 @@ export const LainnyaView: React.FC = () => {
             rows={3}
             className="w-full p-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl border border-transparent focus:border-slate-300 dark:focus:border-slate-700 outline-none font-mono"
           />
-          <button
-            onClick={handleProcessSMS}
-            className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-xs"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>Kirim & Ekstraksi ke Inbox Draft</span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handlePasteClipboardSMS}
+              className="py-2.5 px-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold flex items-center justify-center gap-1.5 transition active:scale-95"
+            >
+              <Clipboard className="w-3.5 h-3.5" />
+              <span>Tempel Clipboard</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleProcessSMS}
+              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-xs transition active:scale-95"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>Kirim & Ekstraksi ke Inbox Draft</span>
+            </button>
+          </div>
         </div>
       )}
 

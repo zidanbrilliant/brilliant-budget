@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { IOSFrame } from './components/common/iOSFrame';
 import { TabBar } from './components/common/TabBar';
@@ -10,9 +10,17 @@ import { BudgetView } from './components/budget/BudgetView';
 import { LainnyaView } from './components/lainnya/LainnyaView';
 import { LockScreen } from './components/security/LockScreen';
 import { OnboardingModal } from './components/onboarding/OnboardingModal';
+import { consumePendingUpload } from './utils/cameraHelper';
 
 const AppContent: React.FC = () => {
-  const { activeTab } = useApp();
+  const { activeTab, openCatat } = useApp();
+
+  useEffect(() => {
+    const pending = consumePendingUpload();
+    if (pending) {
+      openCatat(pending);
+    }
+  }, []);
 
   return (
     <>

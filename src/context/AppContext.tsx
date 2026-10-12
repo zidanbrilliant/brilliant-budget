@@ -24,6 +24,7 @@ import {
   cascadeDeleteCategory,
   SYSTEM_CATEGORY_ID,
 } from '../utils/budgetLogic.ts';
+import { processDueRecurringRules } from '../services/recurringScheduler';
 
 const STORAGE_KEY = 'CATAT_APP_STATE_V4';
 
@@ -82,7 +83,7 @@ interface AppContextType {
 
   addGoal: (goal: Omit<Goal, 'id'>) => void;
   updateGoal: (id: string, updates: Partial<Goal>) => void;
-  contributeToGoal: (id: string, amount: number) => void;
+  contributeToGoal: (id: string, amount: number, accountId?: string) => void;
 
   updateSettings: (updates: Partial<AppSettings>) => void;
   exportBackupData: () => string;
@@ -608,6 +609,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Transaksi berulang dihapus');
   };
 
+  // Auto-execute recurring rules when due
+  useEffect(() => {
+    const runScheduler = () => {
+      setRecurring(prevRules => {
+        return processDueRecurringRules(prevRules, txnData => {
+          addTransaction(txnData);
+        });
+      });
+    };
+
+    runScheduler();
+    const timer = setInterval(runScheduler, 30000);
+    return () => clearInterval(timer);
+  }, [accounts]);
+
   // Goals actions
   const addGoal = (goal: Omit<Goal, 'id'>) => {
     const newGoal: Goal = {
@@ -625,12 +641,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setGoals(prev => prev.map(g => (g.id === id ? { ...g, ...updates } : g)));
   };
 
-  const contributeToGoal = (id: string, amount: number) => {
+  const contributeToGoal = (id: string, amount: number, accountId?: string) => {
     const target = goals.find(g => g.id === id);
     if (!target) return;
+    const debitAccountId = accountId || target.account_id || accounts[0]?.id || 'acc-bca';
+
     setGoals(prev =>
       prev.map(g => (g.id === id ? { ...g, saved_amount: g.saved_amount + amount } : g))
     );
+
+    addTransaction({
+      type: 'expense',
+      amount,
+      category_id: 'cat-lainnya',
+      account_id: debitAccountId,
+      merchant: `Tabungan: ${target.name}`,
+      note: `Setor tabungan impian: ${target.name}`,
+      source: 'manual',
+      status: 'confirmed',
+    });
+
     if (isBackendConnected) {
       api.contributeGoal(id, amount).catch(console.error);
     }
