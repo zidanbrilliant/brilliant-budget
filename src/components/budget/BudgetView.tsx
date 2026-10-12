@@ -11,8 +11,9 @@ import {
   Trash2,
   Edit2,
   Check,
+  PiggyBank,
 } from 'lucide-react';
-import { BudgetMethod, BudgetLine } from '../../types/index.ts';
+import { BudgetMethod, BudgetLine, Goal } from '../../types/index.ts';
 
 export const BudgetView: React.FC = () => {
   const {
@@ -21,6 +22,7 @@ export const BudgetView: React.FC = () => {
     updateBudgetLine,
     categories,
     accounts,
+    getAccountBalance,
     getMonthSummary,
     getCategorySpending,
     recurring,
@@ -28,6 +30,8 @@ export const BudgetView: React.FC = () => {
     goals,
     contributeToGoal,
     addGoal,
+    updateGoal,
+    deleteGoal,
     settings,
   } = useApp();
 
@@ -50,7 +54,17 @@ export const BudgetView: React.FC = () => {
   // New Goal modal state
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [goalName, setGoalName] = useState('');
-  const [goalTarget, setGoalTarget] = useState(0);
+  const [goalTarget, setGoalTarget] = useState(5000000);
+
+  // Edit Goal modal state
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
+  const [editGoalName, setEditGoalName] = useState('');
+  const [editGoalTarget, setEditGoalTarget] = useState<number>(0);
+
+  // Custom Deposit modal state
+  const [contributeGoal, setContributeGoal] = useState<Goal | null>(null);
+  const [contributeAmount, setContributeAmount] = useState<number>(100000);
+  const [contributeAccountId, setContributeAccountId] = useState<string>('');
 
   // New Recurring modal state
   const [isAddRecurringOpen, setIsAddRecurringOpen] = useState(false);
@@ -156,6 +170,40 @@ export const BudgetView: React.FC = () => {
     setIsGoalModalOpen(false);
   };
 
+  const openEditGoalModal = (goal: Goal) => {
+    setEditingGoal(goal);
+    setEditGoalName(goal.name);
+    setEditGoalTarget(goal.target_amount);
+  };
+
+  const handleUpdateGoal = () => {
+    if (!editingGoal || !editGoalName.trim() || editGoalTarget <= 0) return;
+    updateGoal(editingGoal.id, {
+      name: editGoalName.trim(),
+      target_amount: editGoalTarget,
+    });
+    setEditingGoal(null);
+  };
+
+  const handleDeleteGoal = (id: string) => {
+    if (window.confirm('Hapus target tabungan ini?')) {
+      deleteGoal(id);
+      if (editingGoal?.id === id) setEditingGoal(null);
+    }
+  };
+
+  const openContributeModal = (goal: Goal) => {
+    setContributeGoal(goal);
+    setContributeAmount(100000);
+    setContributeAccountId(accounts[0]?.id || 'acc-bca');
+  };
+
+  const handleConfirmContribute = () => {
+    if (!contributeGoal || contributeAmount <= 0) return;
+    contributeToGoal(contributeGoal.id, contributeAmount, contributeAccountId);
+    setContributeGoal(null);
+  };
+
   const handleCreateRecurring = () => {
     if (!recName.trim() || recAmount <= 0) return;
     addRecurring({
@@ -235,8 +283,12 @@ export const BudgetView: React.FC = () => {
       {activeTab === 'budget' && (
         <div className="space-y-3.5">
           {/* Overview Card */}
-          <div className="bg-[#0F172A] dark:bg-[#111827] text-white p-5 rounded-2xl border border-slate-800 shadow-xs space-y-3">
-            <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+          <div className={`${
+            isPinkTheme
+              ? 'bg-gradient-to-br from-[#E11D48] to-[#BE123C] text-white shadow-rose-200/50'
+              : 'bg-[#0F172A] dark:bg-[#111827] text-white border border-slate-800'
+          } p-5 rounded-2xl shadow-xs space-y-3`}>
+            <div className={`flex items-center justify-between ${isPinkTheme ? 'text-pink-100' : 'text-slate-400'} text-xs font-medium`}>
               <span>Batas Pengeluaran Bulan Ini</span>
               <span>Hari Mulai: Tgl {budget.start_day}</span>
             </div>
@@ -426,8 +478,12 @@ export const BudgetView: React.FC = () => {
       {/* ======================= TAB 2: LANGGANAN ======================= */}
       {activeTab === 'recurring' && (
         <div className="space-y-3.5">
-          <div className="bg-[#0F172A] dark:bg-[#111827] text-white p-4 rounded-2xl border border-slate-800 shadow-xs">
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+          <div className={`${
+            isPinkTheme
+              ? 'bg-gradient-to-br from-[#E11D48] to-[#BE123C] text-white shadow-rose-200/50'
+              : 'bg-[#0F172A] dark:bg-[#111827] text-white border border-slate-800'
+          } p-4 rounded-2xl shadow-xs`}>
+            <span className={`text-[10px] ${isPinkTheme ? 'text-pink-100' : 'text-slate-400'} font-bold uppercase tracking-wider block`}>
               Total Biaya Langganan Rutin
             </span>
             <div className="flex items-baseline justify-between mt-1">
@@ -513,28 +569,39 @@ export const BudgetView: React.FC = () => {
 
       {/* ======================= TAB 3: TARGET TABUNGAN ======================= */}
       {activeTab === 'goals' && (
-        <div className="space-y-3.5">
+        <div className="space-y-4">
           <div className="flex items-center justify-between px-1">
-            <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            <h3 className={`text-xs font-bold uppercase tracking-wider ${isPinkTheme ? 'text-pink-600/80' : 'text-slate-400'}`}>
               Target Aktif ({goals.length})
             </h3>
             <button
-              onClick={() => setIsGoalModalOpen(true)}
-              className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950 px-2.5 py-1.5 rounded-lg transition"
+              onClick={() => {
+                setGoalName('');
+                setGoalTarget(5000000);
+                setIsGoalModalOpen(true);
+              }}
+              className={`flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl transition active:scale-95 shadow-2xs ${
+                isPinkTheme
+                  ? 'bg-rose-500 text-white hover:bg-rose-600'
+                  : 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/80 dark:text-emerald-400 hover:bg-emerald-100'
+              }`}
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-4 h-4" />
               <span>Buat Target</span>
             </button>
           </div>
 
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {goals.length === 0 ? (
-              <div className="bg-white dark:bg-[#151E2E] rounded-2xl p-8 text-center border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-1">
-                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <div className="bg-white dark:bg-[#151E2E] rounded-2xl p-8 text-center border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-2">
+                <div className={`w-12 h-12 rounded-2xl mx-auto flex items-center justify-center ${isPinkTheme ? 'bg-pink-100 text-pink-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                  <PiggyBank className="w-6 h-6" />
+                </div>
+                <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
                   Belum ada target tabungan
                 </p>
-                <p className="text-[11px] text-slate-400">
-                  Mulai rencanakan impian Anda dengan mengetuk tombol Buat Target.
+                <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                  Rencanakan impian Anda dengan mengetuk tombol Buat Target di atas.
                 </p>
               </div>
             ) : (
@@ -548,38 +615,69 @@ export const BudgetView: React.FC = () => {
                 return (
                   <div
                     key={goal.id}
-                    className="bg-white dark:bg-[#151E2E] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-2.5"
+                    className={`bg-white dark:bg-[#151E2E] p-4.5 rounded-2xl border ${
+                      isPinkTheme ? 'border-pink-200/80 shadow-pink-100/20' : 'border-slate-200/80 dark:border-slate-800/80 shadow-xs'
+                    } space-y-3`}
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h4 className="text-xs font-bold text-slate-900 dark:text-white">
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">
                           {goal.name}
                         </h4>
-                        <div className="text-[11px] text-slate-400 mt-0.5 tabular-nums">
+                        <div className="text-xs text-slate-400 mt-0.5 tabular-nums">
                           Sisa: {formatIDR(remaining)}
                         </div>
                       </div>
-                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/80 px-2 py-0.5 rounded-md tabular-nums">
-                        {progress}%
-                      </span>
+
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-md tabular-nums ${
+                          isPinkTheme
+                            ? 'bg-pink-100 text-pink-700'
+                            : 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/80'
+                        }`}>
+                          {progress}%
+                        </span>
+                        <button
+                          onClick={() => openEditGoalModal(goal)}
+                          aria-label={`Edit target ${goal.name}`}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteGoal(goal.id)}
+                          aria-label={`Hapus target ${goal.name}`}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                    <div className={`w-full ${isPinkTheme ? 'bg-pink-100' : 'bg-slate-100 dark:bg-slate-800'} h-2 rounded-full overflow-hidden`}>
                       <div
-                        className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+                        className={`h-full rounded-full transition-all duration-300 ${isPinkTheme ? 'bg-gradient-to-r from-pink-400 to-rose-500' : 'bg-emerald-500'}`}
                         style={{ width: `${progress}%` }}
                       ></div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-1 text-xs">
-                      <span className="text-slate-500 dark:text-slate-400 font-medium tabular-nums">
-                        {formatCompactIDR(goal.saved_amount)} / {formatCompactIDR(goal.target_amount)}
-                      </span>
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="text-xs">
+                        <span className={`font-bold tabular-nums ${isPinkTheme ? 'text-rose-600' : 'text-slate-900 dark:text-white'}`}>
+                          {formatCompactIDR(goal.saved_amount)}
+                        </span>
+                        <span className="text-slate-400"> / {formatCompactIDR(goal.target_amount)}</span>
+                      </div>
                       <button
-                        onClick={() => contributeToGoal(goal.id, 500000)}
-                        className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                        onClick={() => openContributeModal(goal)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition active:scale-95 ${
+                          isPinkTheme
+                            ? 'bg-rose-50 text-rose-600 hover:bg-rose-100'
+                            : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 hover:bg-emerald-100'
+                        }`}
                       >
-                        + Nabung 500rb
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Setor Tabungan</span>
                       </button>
                     </div>
                   </div>
@@ -799,11 +897,11 @@ export const BudgetView: React.FC = () => {
       {/* New Goal Modal */}
       {isGoalModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#151E2E] rounded-2xl p-5 max-w-sm w-full space-y-3.5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
+          <div className="bg-white dark:bg-[#151E2E] rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
             <h3 className="font-bold text-sm text-slate-900 dark:text-white">
               Target Tabungan Baru
             </h3>
-            <div className="space-y-2.5 text-xs">
+            <div className="space-y-3 text-xs">
               <div>
                 <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nama Target</label>
                 <input
@@ -811,29 +909,199 @@ export const BudgetView: React.FC = () => {
                   value={goalName}
                   onChange={e => setGoalName(e.target.value)}
                   placeholder="Mis. Dana Darurat, Liburan"
-                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none"
+                  className="w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-semibold"
                 />
               </div>
               <div>
                 <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nominal Target (Rp)</label>
                 <input
                   type="number"
-                  value={goalTarget}
+                  inputMode="numeric"
+                  value={goalTarget || ''}
                   onChange={e => setGoalTarget(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-bold tabular-nums"
+                  placeholder="5000000"
+                  className="w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-bold text-sm tabular-nums"
                 />
               </div>
             </div>
-            <div className="flex gap-2 pt-1">
+            <div className="flex gap-2.5 pt-1">
               <button
                 onClick={() => setIsGoalModalOpen(false)}
-                className="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold"
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300 transition"
               >
                 Batal
               </button>
               <button
                 onClick={handleCreateGoal}
-                className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold"
+                disabled={!goalName.trim() || goalTarget <= 0}
+                className={`flex-1 py-2.5 rounded-xl text-white text-xs font-bold transition shadow-xs disabled:opacity-50 ${
+                  isPinkTheme ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-600 hover:bg-emerald-500'
+                }`}
+              >
+                Simpan Target
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Setor Tabungan (Nominal Custom & Pilih Dompet) */}
+      {contributeGoal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#151E2E] rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
+            <div>
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                Setor ke: {contributeGoal.name}
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Target: {formatIDR(contributeGoal.target_amount)} • Terkumpul: {formatIDR(contributeGoal.saved_amount)}
+              </p>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">
+                  Nominal Setor (Rp)
+                </label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={contributeAmount || ''}
+                  onChange={e => setContributeAmount(Math.max(0, Number(e.target.value)))}
+                  placeholder="Masukkan nominal bebas"
+                  className="w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-bold text-base tabular-nums"
+                />
+              </div>
+
+              {/* Quick Chips */}
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                  Pilihan Cepat
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[50000, 100000, 250000, 500000, 1000000].map(amt => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setContributeAmount(amt)}
+                      className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition active:scale-95 ${
+                        contributeAmount === amt
+                          ? isPinkTheme
+                            ? 'bg-rose-500 text-white border-rose-500'
+                            : 'bg-emerald-600 text-white border-emerald-600'
+                          : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      +{formatCompactIDR(amt)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Source Account Selector */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">
+                  Potong Dari Dompet
+                </label>
+                <select
+                  value={contributeAccountId}
+                  onChange={e => setContributeAccountId(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-semibold text-xs border border-transparent focus:border-slate-300 dark:focus:border-slate-600"
+                >
+                  {accounts.map(acc => {
+                    return (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name} ({formatCompactIDR(getAccountBalance(acc.id))})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-2.5 pt-1">
+              <button
+                onClick={() => setContributeGoal(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300 transition"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleConfirmContribute}
+                disabled={contributeAmount <= 0}
+                className={`flex-1 py-2.5 rounded-xl text-white text-xs font-bold transition shadow-xs disabled:opacity-50 ${
+                  isPinkTheme ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-600 hover:bg-emerald-500'
+                }`}
+              >
+                Konfirmasi Setor
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Edit Target Tabungan */}
+      {editingGoal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#151E2E] rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
+            <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+              Edit Target Tabungan
+            </h3>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">
+                  Nama Target
+                </label>
+                <input
+                  type="text"
+                  value={editGoalName}
+                  onChange={e => setEditGoalName(e.target.value)}
+                  placeholder="Mis. Dana Darurat, Beli HP"
+                  className="w-full px-3.5 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-semibold text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">
+                  Nominal Target (Rp)
+                </label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={editGoalTarget || ''}
+                  onChange={e => setEditGoalTarget(Math.max(0, Number(e.target.value)))}
+                  className="w-full px-3.5 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-bold text-sm tabular-nums"
+                />
+              </div>
+
+              <div className="text-slate-400 text-[11px] bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-200/50 dark:border-slate-800">
+                Terkumpul saat ini: <span className="font-bold text-slate-700 dark:text-slate-200">{formatIDR(editingGoal.saved_amount)}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => handleDeleteGoal(editingGoal.id)}
+                className="py-2.5 px-3 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 text-xs font-bold hover:bg-rose-100 transition"
+              >
+                Hapus
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingGoal(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleUpdateGoal}
+                disabled={!editGoalName.trim() || editGoalTarget <= 0}
+                className={`flex-1 py-2.5 rounded-xl text-white text-xs font-bold transition shadow-xs disabled:opacity-50 ${
+                  isPinkTheme ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-600 hover:bg-emerald-500'
+                }`}
               >
                 Simpan
               </button>

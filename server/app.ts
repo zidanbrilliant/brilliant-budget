@@ -423,6 +423,30 @@ app.post('/api/goals/:id/contribute', (req: Request, res: Response) => {
   res.json(updated);
 });
 
+app.put('/api/goals/:id', (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const { name, target_amount, saved_amount, due_at, account_id } = req.body;
+  db.prepare(`
+    UPDATE goal SET 
+      name = COALESCE(?, name),
+      target_amount = COALESCE(?, target_amount),
+      saved_amount = COALESCE(?, saved_amount),
+      due_at = COALESCE(?, due_at),
+      account_id = COALESCE(?, account_id),
+      updated_at = ?
+    WHERE id = ?
+  `).run(name, target_amount, saved_amount, due_at, account_id, Date.now(), id);
+
+  const updated = db.prepare('SELECT * FROM goal WHERE id = ?').get(id);
+  res.json(updated);
+});
+
+app.delete('/api/goals/:id', (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  db.prepare('DELETE FROM goal WHERE id = ?').run(id);
+  res.json({ success: true, id });
+});
+
 // ---------------- INGESTION / PARSER (FR-6 to FR-25) ----------------
 app.post('/api/parse/voice', (req: Request, res: Response) => {
   const { text } = req.body;

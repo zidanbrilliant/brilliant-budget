@@ -13,7 +13,7 @@
     "test:golden": "node tests/golden-dataset.test.js",
     "test:budget": "node tests/budget-logic.test.js",
     "test:e2e": "e2e run",
-    "test": "node tests/backend-test.js && node tests/golden-dataset.test.js && node tests/budget-logic.test.js && node tests/recurring-and-security.test.js",
+    "test": "node tests/backend-test.js && node tests/golden-dataset.test.js && node tests/budget-logic.test.js && node tests/recurring-and-security.test.js && node tests/goals-and-ui.test.js",
     "ios:sync": "npm run build && npx cap sync ios",
     "ios:open": "npx cap open ios",
     "icons:generate": "node scripts/generate-icons.js"

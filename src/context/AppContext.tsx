@@ -83,6 +83,7 @@ interface AppContextType {
 
   addGoal: (goal: Omit<Goal, 'id'>) => void;
   updateGoal: (id: string, updates: Partial<Goal>) => void;
+  deleteGoal: (id: string) => void;
   contributeToGoal: (id: string, amount: number, accountId?: string) => void;
 
   updateSettings: (updates: Partial<AppSettings>) => void;
@@ -639,6 +640,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateGoal = (id: string, updates: Partial<Goal>) => {
     setGoals(prev => prev.map(g => (g.id === id ? { ...g, ...updates } : g)));
+    if (isBackendConnected) {
+      api.updateGoal(id, updates).catch(console.error);
+    }
+    showToast('Target tabungan diperbarui');
+  };
+
+  const deleteGoal = (id: string) => {
+    setGoals(prev => prev.filter(g => g.id !== id));
+    if (isBackendConnected) {
+      api.deleteGoal(id).catch(console.error);
+    }
+    showToast('Target tabungan dihapus');
   };
 
   const contributeToGoal = (id: string, amount: number, accountId?: string) => {
@@ -766,6 +779,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteRecurring,
         addGoal,
         updateGoal,
+        deleteGoal,
         contributeToGoal,
         updateSettings,
         exportBackupData,
