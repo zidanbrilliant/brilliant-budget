@@ -25,6 +25,7 @@ import {
   SYSTEM_CATEGORY_ID,
 } from '../utils/budgetLogic.ts';
 import { processDueRecurringRules } from '../services/recurringScheduler';
+import { syncTransactionToSheet, flushSheetQueue } from '../services/googleSheets';
 
 const STORAGE_KEY = 'CATAT_APP_STATE_V4';
 
@@ -204,6 +205,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
+  // Flush pending Google Sheets sync queue when online
+  useEffect(() => {
+    const handleOnline = () => {
+      flushSheetQueue().then(count => {
+        if (count > 0) showToast(`${count} transaksi disinkron ke Google Sheets`);
+      }).catch(console.error);
+    };
+    window.addEventListener('online', handleOnline);
+    if (navigator.onLine) handleOnline();
+    return () => window.removeEventListener('online', handleOnline);
+  }, []);
+
   // Sync to localStorage as offline mirror
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY + '_accounts', JSON.stringify(accounts));
@@ -364,6 +377,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       api.createTransaction(newTxn).catch(console.error);
     }
 
+    // Async sync to Google Sheets
+    if (newTxn.status === 'confirmed') {
+      const catName = categories.find(c => c.id === newTxn.category_id)?.name || 'Lainnya';
+      const accName = accounts.find(a => a.id === newTxn.account_id)?.name || 'Dompet';
+      const dateStr = new Date(newTxn.occurred_at).toLocaleString('sv-SE');
+      syncTransactionToSheet({
+        date: dateStr,
+        type: newTxn.type,
+        category: catName,
+        amount: newTxn.amount,
+        account: accName,
+        note: newTxn.merchant ? `${newTxn.merchant} ${newTxn.note ? `(${newTxn.note})` : ''}`.trim() : (newTxn.note || '-'),
+        source: newTxn.source,
+      }).catch(console.error);
+    }
+
     return newTxn;
   };
 
@@ -401,25 +430,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const confirmDraft = (id: string) => {
+    const target = transactions.find(t => t.id === id);
     setTransactions(prev =>
       prev.map(t => (t.id === id ? { ...t, status: 'confirmed', updated_at: Date.now() } : t))
     );
     if (isBackendConnected) {
       api.confirmDraft(id).catch(console.error);
     }
+    if (target) {
+      const catName = categories.find(c => c.id === target.category_id)?.name || 'Lainnya';
+      const accName = accounts.find(a => a.id === target.account_id)?.name || 'Dompet';
+      const dateStr = new Date(target.occurred_at).toLocaleString('sv-SE');
+      syncTransactionToSheet({
+        date: dateStr,
+        type: target.type,
+        category: catName,
+        amount: target.amount,
+        account: accName,
+        note: target.merchant ? `${target.merchant} ${target.note ? `(${target.note})` : ''}`.trim() : (target.note || '-'),
+        source: target.source,
+      }).catch(console.error);
+    }
     showToast('Draft dikonfirmasi');
   };
 
   const confirmAllDrafts = () => {
-    const draftCount = transactions.filter(t => t.status === 'draft' && !t.deleted_at).length;
-    if (draftCount === 0) return;
+    const pendingDrafts = transactions.filter(t => t.status === 'draft' && !t.deleted_at);
+    if (pendingDrafts.length === 0) return;
     setTransactions(prev =>
       prev.map(t => (t.status === 'draft' ? { ...t, status: 'confirmed', updated_at: Date.now() } : t))
     );
     if (isBackendConnected) {
       api.confirmAllDrafts().catch(console.error);
     }
-    showToast(`${draftCount} draft berhasil dikonfirmasi`);
+    pendingDrafts.forEach(d => {
+      const catName = categories.find(c => c.id === d.category_id)?.name || 'Lainnya';
+      const accName = accounts.find(a => a.id === d.account_id)?.name || 'Dompet';
+      const dateStr = new Date(d.occurred_at).toLocaleString('sv-SE');
+      syncTransactionToSheet({
+        date: dateStr,
+        type: d.type,
+        category: catName,
+        amount: d.amount,
+        account: accName,
+        note: d.merchant ? `${d.merchant} ${d.note ? `(${d.note})` : ''}`.trim() : (d.note || '-'),
+        source: d.source,
+      }).catch(console.error);
+    });
+    showToast(`${pendingDrafts.length} draft berhasil dikonfirmasi`);
   };
 
   const discardDraft = (id: string) => {

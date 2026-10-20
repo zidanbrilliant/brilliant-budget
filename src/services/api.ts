@@ -3,12 +3,21 @@ import { Account, Category, Txn, BudgetPlan, RecurringRule, Goal } from '../type
 const BASE_URL = '/api';
 
 async function req<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...options,
-    headers: options?.body ? { 'Content-Type': 'application/json', ...options?.headers } : options?.headers,
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  // ponytail: 1500ms timeout prevents hanging when deployed serverless without local node backend
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 1500);
+
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, {
+      ...options,
+      signal: controller.signal,
+      headers: options?.body ? { 'Content-Type': 'application/json', ...options?.headers } : options?.headers,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export const api = {

@@ -19,6 +19,22 @@ const AppContent: React.FC = () => {
     const pending = consumePendingUpload();
     if (pending) {
       openCatat(pending);
+      return;
+    }
+
+    // ponytail: fast-entry via URL hash or query param (e.g. /#catat or /?action=catat)
+    const hash = window.location.hash.toLowerCase().replace('#', '');
+    const search = new URLSearchParams(window.location.search);
+    const action = search.get('action') || hash;
+
+    if (action === 'catat' || action === 'manual') {
+      openCatat('manual');
+    } else if (action === 'voice') {
+      openCatat('voice');
+    } else if (action === 'ocr') {
+      openCatat('ocr');
+    } else if (action === 'qr') {
+      openCatat('qr');
     }
   }, []);
 
