@@ -83,6 +83,52 @@ app.post('/api/accounts', (req: Request, res: Response) => {
   res.status(201).json({ id, name, type, opening_balance, icon, color, balance: opening_balance });
 });
 
+// Hapus dompet: pindahkan transaksi, langganan, target, dan saldo ke dompet lain.
+app.delete('/api/accounts/:id', (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const target = db
+    .prepare('SELECT * FROM account WHERE id = ? AND deleted_at IS NULL')
+    .get(id) as any;
+
+  if (!target) {
+    return res.status(404).json({ error: 'Dompet tidak ditemukan' });
+  }
+
+  const candidates = db
+    .prepare('SELECT id FROM account WHERE id != ? AND is_archived = 0 AND deleted_at IS NULL')
+    .all(id) as Array<{ id: string }>;
+
+  if (candidates.length === 0) {
+    return res.status(400).json({ error: 'Minimal harus ada 1 dompet aktif' });
+  }
+
+  const requested = typeof req.query.reassign_to === 'string' ? req.query.reassign_to : undefined;
+  const fallback = candidates.find(account => account.id === requested) || candidates[0];
+  const now = Date.now();
+
+  db.transaction(() => {
+    db.prepare(
+      'UPDATE txn SET account_id = ?, updated_at = ? WHERE account_id = ? AND deleted_at IS NULL'
+    ).run(fallback.id, now, id);
+    db.prepare(
+      'UPDATE txn SET to_account_id = ?, updated_at = ? WHERE to_account_id = ? AND deleted_at IS NULL'
+    ).run(fallback.id, now, id);
+    db.prepare('UPDATE recurring_rule SET account_id = ? WHERE account_id = ?').run(
+      fallback.id,
+      id
+    );
+    db.prepare('UPDATE goal SET account_id = ? WHERE account_id = ?').run(fallback.id, id);
+    db.prepare(
+      'UPDATE account SET opening_balance = opening_balance + ?, updated_at = ? WHERE id = ?'
+    ).run(Number(target.opening_balance) || 0, now, fallback.id);
+    db.prepare(
+      'UPDATE account SET is_archived = 1, deleted_at = ?, updated_at = ? WHERE id = ?'
+    ).run(now, now, id);
+  })();
+
+  res.json({ success: true, reassigned_to: fallback.id });
+});
+
 // Rekonsiliasi Saldo Akun (FR-30)
 app.post('/api/accounts/:id/reconcile', (req: Request, res: Response) => {
   const accountId = String(req.params.id);

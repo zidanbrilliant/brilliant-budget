@@ -23,6 +23,7 @@ import {
   cascadeDeleteCategory,
   SYSTEM_CATEGORY_ID,
 } from '../utils/budgetLogic.ts';
+import { cascadeDeleteAccount } from '../utils/accountDeletion.ts';
 import { processDueRecurringRules } from '../services/recurringScheduler';
 import { syncTransactionToSheet, flushSheetQueue } from '../services/googleSheets';
 
@@ -69,6 +70,7 @@ interface AppContextType {
 
   addAccount: (acc: Omit<Account, 'id' | 'created_at' | 'updated_at'>) => void;
   updateAccount: (id: string, updates: Partial<Account>) => void;
+  deleteAccount: (id: string, reassignToId?: string) => void;
   adjustAccountBalance: (id: string, newBalance: number, note?: string) => void;
   addCategory: (cat: Omit<Category, 'id' | 'sort_order'>) => void;
   updateCategory: (id: string, updates: Partial<Category>) => void;
@@ -598,6 +600,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+  const deleteAccount = (id: string, reassignToId?: string) => {
+    const result = cascadeDeleteAccount(
+      accounts,
+      id,
+      transactions,
+      recurring,
+      goals,
+      reassignToId
+    );
+
+    if (!result.success) {
+      showToast(result.error || 'Gagal menghapus dompet');
+      return;
+    }
+
+    const deletedName = accounts.find(a => a.id === id)?.name || 'Dompet';
+    const targetName =
+      accounts.find(a => a.id === result.reassignedTo)?.name || 'dompet tujuan';
+
+    setAccounts(result.updatedAccounts);
+    setTransactions(result.updatedTransactions);
+    setRecurring(result.updatedRecurring);
+    setGoals(result.updatedGoals);
+
+    if (isBackendConnected) {
+      api.deleteAccount(id, result.reassignedTo).catch(console.error);
+    }
+
+    showToast(
+      result.reassignedTxnCount > 0
+        ? `${deletedName} dihapus, ${result.reassignedTxnCount} transaksi dipindahkan ke ${targetName}`
+        : `${deletedName} dihapus`
+    );
+  };
+
   // Rekonsiliasi / Penyesuaian Saldo (FR-30)
   const adjustAccountBalance = (id: string, newBalance: number, note?: string) => {
     const current = getAccountBalance(id);
@@ -817,6 +854,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         discardDraft,
         addAccount,
         updateAccount,
+        deleteAccount,
         adjustAccountBalance,
         addCategory,
         updateCategory,

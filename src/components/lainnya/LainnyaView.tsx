@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatIDR, formatCompactIDR } from '../../utils/formatters';
 import { AppIcon } from '../common/IconHelper';
+import { ReportPieChart } from '../common/ReportPieChart';
+import { buildReportSummary, type ReportPeriodMode } from '../../utils/reporting';
 import {
   CreditCard,
   PieChart,
@@ -25,7 +27,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { parseOCRText } from '../../utils/parser';
-import { Category } from '../../types/index.ts';
+import { Account, Category } from '../../types/index.ts';
 import {
   getSheetWebhookUrl,
   setSheetWebhookUrl,
@@ -45,10 +47,10 @@ export const LainnyaView: React.FC = () => {
     getTotalNetWorth,
     adjustAccountBalance,
     addAccount,
+    deleteAccount,
     addCategory,
     updateCategory,
     deleteCategory,
-    getMonthSummary,
     settings,
     updateSettings,
     exportBackupData,
@@ -130,6 +132,15 @@ export const LainnyaView: React.FC = () => {
   const [newWalletType, setNewWalletType] = useState<'bank' | 'ewallet' | 'cash'>('bank');
   const [newWalletBalance, setNewWalletBalance] = useState<number>(0);
 
+  // Delete Wallet modal
+  const [deletingWallet, setDeletingWallet] = useState<Account | null>(null);
+  const [reassignWalletId, setReassignWalletId] = useState('');
+
+  // Financial report period
+  const [reportMode, setReportMode] = useState<ReportPeriodMode>('month');
+  const [reportMonth, setReportMonth] = useState(() => new Date().getMonth());
+  const [reportYear, setReportYear] = useState(() => new Date().getFullYear());
+
   // Transfer modal
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [fromAcc, setFromAcc] = useState(accounts[0]?.id || '');
@@ -143,6 +154,46 @@ export const LainnyaView: React.FC = () => {
   );
 
   const totalNetWorth = getTotalNetWorth();
+
+  const reportCard = isPinkTheme
+    ? 'bg-white border-pink-200/80'
+    : 'bg-white dark:bg-[#151E2E] border-slate-200/80 dark:border-slate-800/80';
+  const reportSummary = useMemo(
+    () => buildReportSummary(transactions, categories, reportMode, reportYear, reportMonth),
+    [transactions, categories, reportMode, reportYear, reportMonth]
+  );
+  const reportPeriodLabel = useMemo(
+    () =>
+      reportMode === 'year'
+        ? `Tahun ${reportYear}`
+        : new Date(reportYear, reportMonth, 1).toLocaleDateString('id-ID', {
+            month: 'long',
+            year: 'numeric',
+          }),
+    [reportMode, reportMonth, reportYear]
+  );
+  const topExpense = reportSummary.slices[0];
+
+  const shiftReportPeriod = (delta: number) => {
+    if (reportMode === 'month') {
+      const next = new Date(reportYear, reportMonth + delta, 1);
+      setReportMonth(next.getMonth());
+      setReportYear(next.getFullYear());
+      return;
+    }
+    setReportYear(year => year + delta);
+  };
+
+  const openDeleteWallet = (account: Account) => {
+    setDeletingWallet(account);
+    setReassignWalletId(accounts.find(a => a.id !== account.id)?.id || '');
+  };
+
+  const confirmDeleteWallet = () => {
+    if (!deletingWallet) return;
+    deleteAccount(deletingWallet.id, reassignWalletId);
+    setDeletingWallet(null);
+  };
 
   // Export CSV (FR-52)
   const handleExportCSV = () => {
@@ -551,17 +602,17 @@ export const LainnyaView: React.FC = () => {
               return (
                 <div
                   key={acc.id}
-                  className="p-3.5 flex items-center justify-between"
+                  className="p-3.5 flex items-center justify-between gap-2"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div
-                      className="w-8 h-8 rounded-xl flex items-center justify-center text-white"
+                      className="w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0"
                       style={{ backgroundColor: acc.color }}
                     >
                       <AppIcon name={acc.icon} className="w-4 h-4 text-white" />
                     </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-900 dark:text-white">
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
                         {acc.name}
                       </div>
                       <div className="text-[10px] text-slate-400 uppercase font-semibold">
@@ -570,19 +621,34 @@ export const LainnyaView: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="text-right">
-                    <div className="text-xs font-extrabold tabular-nums text-slate-900 dark:text-white">
-                      {formatIDR(balance)}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="text-right">
+                      <div className="text-xs font-extrabold tabular-nums text-slate-900 dark:text-white">
+                        {formatIDR(balance)}
+                      </div>
+                      <button
+                        onClick={() => {
+                          setAdjustAccId(acc.id);
+                          setNewBalanceInput(balance);
+                        }}
+                        className={`text-[11px] font-semibold hover:underline mt-0.5 ${isPinkTheme ? 'text-pink-600' : 'text-emerald-600 dark:text-emerald-400'}`}
+                      >
+                        Sesuaikan Saldo
+                      </button>
                     </div>
-                    <button
-                      onClick={() => {
-                        setAdjustAccId(acc.id);
-                        setNewBalanceInput(balance);
-                      }}
-                      className={`text-[11px] font-semibold hover:underline mt-0.5 ${isPinkTheme ? 'text-pink-600' : 'text-emerald-600 dark:text-emerald-400'}`}
-                    >
-                      Sesuaikan Saldo
-                    </button>
+                    {accounts.length > 1 && (
+                      <button
+                        onClick={() => openDeleteWallet(acc)}
+                        aria-label={`Hapus dompet ${acc.name}`}
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center transition shrink-0 ${
+                          isPinkTheme
+                            ? 'text-pink-400 hover:text-rose-600 hover:bg-rose-50'
+                            : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40'
+                        }`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -669,7 +735,9 @@ export const LainnyaView: React.FC = () => {
       {activeSection === 'laporan' && (
         <div className="space-y-3.5">
           <div className="flex items-center justify-between px-1">
-            <span className="text-[11px] text-slate-400 font-semibold">Ringkasan bulan ini</span>
+            <span className="text-[11px] text-slate-400 font-semibold">
+              Ringkasan {reportMode === 'month' ? 'bulanan' : 'tahunan'}
+            </span>
             <button
               onClick={() => setIsPdfModalOpen(true)}
               className="flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 px-2.5 py-1.5 rounded-lg transition active:scale-95"
@@ -679,53 +747,178 @@ export const LainnyaView: React.FC = () => {
             </button>
           </div>
 
+          {/* Period selector */}
+          <div className={`rounded-2xl border p-3 shadow-xs ${reportCard}`}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div
+                className={`flex rounded-xl p-0.5 ${
+                  isPinkTheme ? 'bg-pink-100/70' : 'bg-slate-100 dark:bg-slate-800'
+                }`}
+              >
+                <button
+                  onClick={() => setReportMode('month')}
+                  aria-pressed={reportMode === 'month'}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition ${
+                    reportMode === 'month'
+                      ? isPinkTheme
+                        ? 'bg-white text-rose-600 shadow-2xs'
+                        : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
+                      : isPinkTheme
+                      ? 'text-pink-600/70'
+                      : 'text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  Bulanan
+                </button>
+                <button
+                  onClick={() => setReportMode('year')}
+                  aria-pressed={reportMode === 'year'}
+                  className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition ${
+                    reportMode === 'year'
+                      ? isPinkTheme
+                        ? 'bg-white text-rose-600 shadow-2xs'
+                        : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-2xs'
+                      : isPinkTheme
+                      ? 'text-pink-600/70'
+                      : 'text-slate-500 dark:text-slate-400'
+                  }`}
+                >
+                  Tahunan
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1 ml-auto">
+                <button
+                  onClick={() => shiftReportPeriod(-1)}
+                  aria-label="Periode sebelumnya"
+                  className={`w-7 h-7 rounded-lg flex items-center justify-center transition ${
+                    isPinkTheme
+                      ? 'text-pink-500 hover:bg-pink-50'
+                      : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <span
+                  className={`min-w-[92px] text-center text-[11px] font-bold tabular-nums ${
+                    isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'
+                  }`}
+                >
+                  {reportPeriodLabel}
+                </span>
+                <button
+                  onClick={() => shiftReportPeriod(1)}
+                  aria-label="Periode berikutnya"
+                  className={`w-7 h-7 rounded-lg flex items-center justify-center transition ${
+                    isPinkTheme
+                      ? 'text-pink-500 hover:bg-pink-50'
+                      : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Summary for the selected period */}
+          <div
+            className={`rounded-2xl border p-3.5 space-y-1.5 text-xs shadow-xs ${reportCard} ${
+              isPinkTheme ? 'text-[#4C1D2E]' : 'text-slate-700 dark:text-slate-300'
+            }`}
+          >
+            <div className="flex justify-between gap-2">
+              <span className="text-slate-400">Total Pemasukan</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                {formatIDR(reportSummary.income)}
+              </span>
+            </div>
+            <div className="flex justify-between gap-2">
+              <span className="text-slate-400">Total Pengeluaran</span>
+              <span className="font-bold text-rose-600 dark:text-rose-400 tabular-nums">
+                {formatIDR(reportSummary.expense)}
+              </span>
+            </div>
+            <div
+              className={`flex justify-between gap-2 border-t pt-1.5 font-bold ${
+                isPinkTheme ? 'border-pink-100' : 'border-slate-100 dark:border-slate-800'
+              }`}
+            >
+              <span>Arus Bersih</span>
+              <span
+                className={`tabular-nums ${
+                  reportSummary.balance >= 0
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-rose-600 dark:text-rose-400'
+                }`}
+              >
+                {formatIDR(reportSummary.balance)}
+              </span>
+            </div>
+          </div>
+
+          {/* Expense pie chart */}
+          <div className={`rounded-2xl border p-4 shadow-xs ${reportCard}`}>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div
+                  className={`text-xs font-bold ${
+                    isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'
+                  }`}
+                >
+                  Diagram Pengeluaran
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">{reportPeriodLabel}</div>
+              </div>
+              <span
+                className={`text-[10px] font-bold px-2 py-1 rounded-lg shrink-0 ${
+                  isPinkTheme
+                    ? 'bg-pink-50 text-pink-600'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-300'
+                }`}
+              >
+                {reportSummary.slices.length} kategori
+              </span>
+            </div>
+            <ReportPieChart
+              slices={reportSummary.slices}
+              total={reportSummary.expense}
+              isPinkTheme={isPinkTheme}
+              periodLabel={reportPeriodLabel}
+            />
+          </div>
+
           {/* Wawasan Card */}
           <div className="bg-[#0F172A] dark:bg-[#111827] text-white p-4 rounded-2xl border border-slate-800 space-y-2">
-            <div className={`flex items-center gap-1.5 text-xs font-bold ${isPinkTheme ? 'text-pink-300' : 'text-emerald-400'}`}>
+            <div
+              className={`flex items-center gap-1.5 text-xs font-bold ${
+                isPinkTheme ? 'text-pink-300' : 'text-emerald-400'
+              }`}
+            >
               <Sparkles className="w-4 h-4" />
               <span>Wawasan On-Device</span>
             </div>
             <div className="space-y-1 text-xs text-slate-300 leading-relaxed">
-              <div>• Pengeluaran bulan ini: <strong className="tabular-nums">{formatIDR(getMonthSummary().expense)}</strong>.</div>
-              <div>• Langganan aktif: {recurring.filter(r => r.is_subscription).length} layanan ({formatIDR(recurring.filter(r => r.is_subscription).reduce((s, r) => s + r.amount, 0))}/bln).</div>
-            </div>
-          </div>
-
-          {/* Breakdown per category */}
-          <div className="space-y-1.5">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
-              Pengeluaran Terbesar per Kategori:
-            </span>
-            <div className="bg-white dark:bg-[#151E2E] rounded-2xl divide-y divide-slate-100 dark:divide-slate-800/80 border border-slate-200/80 dark:border-slate-800/80 shadow-xs overflow-hidden">
-              {categories
-                .filter(c => c.kind === 'expense')
-                .map(cat => {
-                  const spent = transactions
-                    .filter(t => t.category_id === cat.id && t.status === 'confirmed' && !t.deleted_at)
-                    .reduce((sum, t) => sum + t.amount, 0);
-
-                  if (spent === 0) return null;
-
-                  return (
-                    <div
-                      key={cat.id}
-                      className="p-3 flex items-center justify-between text-xs"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full"
-                          style={{ backgroundColor: cat.color }}
-                        ></span>
-                        <span className="font-bold text-slate-800 dark:text-slate-200">
-                          {cat.name}
-                        </span>
-                      </div>
-                      <span className="font-bold tabular-nums text-slate-900 dark:text-white">
-                        {formatIDR(spent)}
-                      </span>
-                    </div>
-                  );
-                })}
+              <div>
+                • Pengeluaran {reportPeriodLabel}:{' '}
+                <strong className="tabular-nums">{formatIDR(reportSummary.expense)}</strong>.
+              </div>
+              <div>
+                • Kategori terbesar:{' '}
+                {topExpense ? (
+                  <strong>
+                    {topExpense.name} ({Math.round(topExpense.percent)}%)
+                  </strong>
+                ) : (
+                  'belum ada data'
+                )}
+                .
+              </div>
+              <div>
+                • Langganan aktif: {recurring.filter(r => r.is_subscription).length} layanan (
+                {formatIDR(recurring.filter(r => r.is_subscription).reduce((s, r) => s + r.amount, 0))}
+                /bln).
+              </div>
             </div>
           </div>
         </div>
@@ -1041,6 +1234,109 @@ export const LainnyaView: React.FC = () => {
         </div>
       )}
 
+      {/* Modal Hapus Dompet */}
+      {deletingWallet && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-wallet-title"
+            className={modalCard}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3
+                  id="delete-wallet-title"
+                  className={`font-bold text-sm ${
+                    isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'
+                  }`}
+                >
+                  Hapus Dompet?
+                </h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Transaksi dan saldo tidak akan hilang.
+                </p>
+              </div>
+              <button
+                onClick={() => setDeletingWallet(null)}
+                aria-label="Tutup"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div
+              className={`rounded-xl border p-3 text-xs space-y-1.5 ${
+                isPinkTheme
+                  ? 'bg-white border-pink-200/70 text-[#4C1D2E]'
+                  : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200/60 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+              }`}
+            >
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-400">Dompet</span>
+                <span className="font-bold text-right truncate">{deletingWallet.name}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-400">Saldo saat ini</span>
+                <span className="font-bold tabular-nums">
+                  {formatIDR(getAccountBalance(deletingWallet.id))}
+                </span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-400">Transaksi terkait</span>
+                <span className="font-bold tabular-nums">
+                  {
+                    transactions.filter(
+                      t =>
+                        t.account_id === deletingWallet.id ||
+                        t.to_account_id === deletingWallet.id
+                    ).length
+                  }
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label className={labelClass}>Pindahkan ke Dompet</label>
+              <select
+                value={reassignWalletId}
+                onChange={e => setReassignWalletId(e.target.value)}
+                className={`${fieldClass} font-semibold`}
+              >
+                {accounts
+                  .filter(a => a.id !== deletingWallet.id)
+                  .map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <p className="text-[10px] text-slate-400 leading-relaxed">
+              Semua transaksi, langganan, dan target tabungan yang memakai dompet ini akan
+              dialihkan. Saldo dompet ini ikut dipindahkan ke dompet tujuan.
+            </p>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setDeletingWallet(null)}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${secondaryBtn}`}
+              >
+                Batal
+              </button>
+              <button
+                onClick={confirmDeleteWallet}
+                className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white transition active:scale-[0.98]"
+              >
+                Hapus Dompet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Transfer Antar Dompet */}
       {isTransferOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
@@ -1342,7 +1638,9 @@ export const LainnyaView: React.FC = () => {
                 <h3 className={`font-bold text-sm ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
                   Ringkasan Laporan Keuangan
                 </h3>
-                <span className="text-[11px] text-slate-400">Format ringkas siap cetak atau simpan PDF</span>
+                <span className="text-[11px] text-slate-400">
+                  {reportPeriodLabel} • Format ringkas siap cetak atau simpan PDF
+                </span>
               </div>
               <button
                 onClick={() => setIsPdfModalOpen(false)}
@@ -1361,32 +1659,38 @@ export const LainnyaView: React.FC = () => {
               }`}>
                 <div className="flex justify-between">
                   <span>Total Pemasukan:</span>
-                  <span className="font-bold text-emerald-600 tabular-nums">{formatIDR(getMonthSummary().income)}</span>
+                  <span className="font-bold text-emerald-600 tabular-nums">{formatIDR(reportSummary.income)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Total Pengeluaran:</span>
-                  <span className="font-bold text-rose-600 tabular-nums">{formatIDR(getMonthSummary().expense)}</span>
+                  <span className="font-bold text-rose-600 tabular-nums">{formatIDR(reportSummary.expense)}</span>
                 </div>
                 <div className="flex justify-between border-t pt-1 font-bold">
                   <span>Arus Bersih:</span>
-                  <span className="tabular-nums">{formatIDR(getMonthSummary().balance)}</span>
+                  <span className="tabular-nums">{formatIDR(reportSummary.balance)}</span>
                 </div>
               </div>
 
               <div>
                 <span className="font-bold block mb-1">Rincian Pengeluaran Teratas:</span>
                 <div className="space-y-1">
-                  {categories.filter(c => c.kind === 'expense').slice(0, 5).map(c => {
-                    const spent = transactions
-                      .filter(t => t.category_id === c.id && t.status === 'confirmed' && !t.deleted_at)
-                      .reduce((sum, t) => sum + t.amount, 0);
-                    return (
-                      <div key={c.id} className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                        <span>{c.name}</span>
-                        <span className="font-semibold tabular-nums">{formatIDR(spent)}</span>
+                  {reportSummary.slices.length === 0 ? (
+                    <div className="text-slate-400 py-1">Belum ada pengeluaran pada periode ini.</div>
+                  ) : (
+                    reportSummary.slices.slice(0, 5).map(c => (
+                      <div
+                        key={c.id}
+                        className="flex justify-between gap-2 py-1 border-b border-slate-100 dark:border-slate-800"
+                      >
+                        <span className="min-w-0 truncate">
+                          {c.name} ({Math.round(c.percent)}%)
+                        </span>
+                        <span className="font-semibold tabular-nums shrink-0">
+                          {formatIDR(c.amount)}
+                        </span>
                       </div>
-                    );
-                  })}
+                    ))
+                  )}
                 </div>
               </div>
             </div>

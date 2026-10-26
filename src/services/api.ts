@@ -24,6 +24,11 @@ export const api = {
   getHealth: () => req<{ status: string }>('/health'),
   getAccounts: () => req<Account[]>('/accounts'),
   createAccount: (acc: Partial<Account>) => req<Account>('/accounts', { method: 'POST', body: JSON.stringify(acc) }),
+  deleteAccount: (id: string, reassignToId?: string) =>
+    req<{ success: boolean; reassigned_to: string }>(
+      `/accounts/${id}${reassignToId ? `?reassign_to=${encodeURIComponent(reassignToId)}` : ''}`,
+      { method: 'DELETE' }
+    ),
   reconcileAccount: (id: string, newBalance: number, note?: string) =>
     req<{ success: boolean; balance: number }>(`/accounts/${id}/reconcile`, { method: 'POST', body: JSON.stringify({ new_balance: newBalance, note }) }),
   getCategories: () => req<Category[]>('/categories'),
