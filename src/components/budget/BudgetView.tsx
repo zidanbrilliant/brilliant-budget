@@ -3,6 +3,8 @@ import { useApp } from '../../context/AppContext';
 import { formatIDR, formatCompactIDR } from '../../utils/formatters';
 import { AppIcon } from '../common/IconHelper';
 import { DateField } from '../common/DateField';
+import { DayOfMonthField } from '../common/DayOfMonthField';
+import { getNextRunForDay } from '../../utils/recurring';
 import {
   AlertTriangle,
   Plus,
@@ -176,7 +178,8 @@ export const BudgetView: React.FC = () => {
   const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null);
   const [recName, setRecName] = useState('');
   const [recAmount, setRecAmount] = useState(0);
-  const [recDay, setRecDay] = useState(1);
+  const [recDay, setRecDay] = useState<number | null>(null);
+  const [recDayError, setRecDayError] = useState('');
   const [recIsSub, setRecIsSub] = useState(true);
   const [recTenor, setRecTenor] = useState(12);
   const [recAccount, setRecAccount] = useState('acc-bca');
@@ -372,23 +375,12 @@ export const BudgetView: React.FC = () => {
     setContributeGoal(null);
   };
 
-  const getNextRunForDay = (day: number) => {
-    const now = new Date();
-    const safeDay = Math.min(Math.max(1, Math.round(day) || 1), 31);
-    const build = (year: number, month: number) => {
-      const lastDay = new Date(year, month + 1, 0).getDate();
-      return new Date(year, month, Math.min(safeDay, lastDay), 8, 0, 0, 0).getTime();
-    };
-    let next = build(now.getFullYear(), now.getMonth());
-    if (next <= now.getTime()) next = build(now.getFullYear(), now.getMonth() + 1);
-    return next;
-  };
-
   const resetRecurringForm = () => {
     setEditingRecurringId(null);
     setRecName('');
     setRecAmount(0);
-    setRecDay(1);
+    setRecDay(null);
+    setRecDayError('');
     setRecIsSub(true);
     setRecTenor(12);
     setRecAccount(accounts[0]?.id || 'acc-bca');
@@ -406,7 +398,8 @@ export const BudgetView: React.FC = () => {
     setEditingRecurringId(rule.id);
     setRecName(rule.name);
     setRecAmount(rule.amount);
-    setRecDay(rule.day_of_month || 1);
+    setRecDay(rule.day_of_month || null);
+    setRecDayError('');
     setRecIsSub(Boolean(rule.is_subscription));
     setRecTenor(rule.total_tenor || 12);
     setRecAccount(rule.account_id || accounts[0]?.id || 'acc-bca');
@@ -421,6 +414,11 @@ export const BudgetView: React.FC = () => {
       showToast('Isi nama dan nominal yang valid');
       return;
     }
+    if (recDay === null) {
+      setRecDayError('Pilih tanggal dulu.');
+      return;
+    }
+    setRecDayError('');
 
     const existing = editingRecurringId
       ? recurring.find(r => r.id === editingRecurringId)
@@ -1735,15 +1733,15 @@ export const BudgetView: React.FC = () => {
                 </div>
                 <div>
                   <label className={labelClass}>Tanggal</label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    max={31}
-                    value={recDay || ''}
-                    placeholder="1"
-                    onChange={e => setRecDay(Math.min(31, Math.max(1, Number(e.target.value) || 1)))}
-                    className={`${fieldClass} py-2.5 tabular-nums`}
+                  <DayOfMonthField
+                    value={recDay}
+                    onChange={day => {
+                      setRecDay(day);
+                      setRecDayError('');
+                    }}
+                    ariaLabel="Tanggal jatuh tempo"
+                    isPinkTheme={isPinkTheme}
+                    error={recDayError}
                   />
                 </div>
               </div>

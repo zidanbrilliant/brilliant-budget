@@ -128,5 +128,47 @@ test('savings goal tab creates goal with deadline', async ({ app, screen }) => {
   await expect(screen.getByText('Dana Darurat')).toBeVisible();
   await expect(screen.getByText('30 Jun 2027')).toBeVisible();
   await expect(screen.getByText('Kurang Rp 12.000.000')).toBeVisible();
-  await expect(screen.getByText('Total terkumpul')).toBeVisible();});
+  await expect(screen.getByText('Total terkumpul')).toBeVisible();
+});
+
+test('recurring subscription picks a day from the calendar', async ({ app, screen }) => {
+  await app.open('/');
+  await expect(screen.getByText('On-Device')).toBeVisible();
+
+  await screen.getByRole('button', { name: 'Budget', exact: true }).click();
+  await screen.getByRole('button', { name: 'Langganan', exact: true }).first().click();
+  await screen.getByRole('button', { name: 'Langganan', exact: true }).last().click();
+
+  await expect(
+    screen.getByRole('heading', { name: 'Tambah Langganan / Rutinitas' })
+  ).toBeVisible();
+
+  const dateField = screen.getByRole('button', { name: 'Tanggal jatuh tempo' });
+  await expect(dateField).toHaveText('Pilih tanggal');
+
+  await dateField.click();
+  await expect(screen.getByRole('dialog', { name: 'Pilih tanggal' })).toBeVisible();
+  await screen.getByRole('button', { name: 'Tanggal 15', exact: true }).click();
+  await expect(dateField).toHaveText('Tgl 15');
+
+  await screen.getByPlaceholder('Mis. Spotify, iCloud, BPJS').fill('Netflix');
+  await screen.getByPlaceholder('0').first().fill('54000');
+  await screen.getByRole('button', { name: 'Simpan', exact: true }).click();
+
+  await expect(screen.getByText(/Tiap tgl 15/)).toBeVisible();
+
+  // Editing shows the saved day, and the field can be emptied again.
+  await screen.getByRole('button', { name: 'Edit Netflix' }).click();
+  await expect(dateField).toHaveText('Tgl 15');
+  await screen.getByRole('button', { name: 'Hapus tanggal' }).click();
+  await expect(dateField).toHaveText('Pilih tanggal');
+  await screen.getByRole('button', { name: 'Simpan Perubahan' }).click();
+  await expect(screen.getByText('Pilih tanggal dulu.')).toBeVisible();
+
+  // Pick another day and save the change.
+  await dateField.click();
+  await screen.getByRole('button', { name: 'Tanggal 31', exact: true }).click();
+  await screen.getByRole('button', { name: 'Simpan Perubahan' }).click();
+  await expect(screen.getByText(/Tiap tgl 31/)).toBeVisible();
+});
 
