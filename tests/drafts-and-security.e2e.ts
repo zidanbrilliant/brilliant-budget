@@ -8,7 +8,7 @@ test('sms bank simulator creates draft and confirm on home', async ({ app, scree
   // Go to Lainnya -> Simulator SMS
   await screen.getByRole('button', { name: 'Lainnya', exact: true }).click();
   await screen.getByText('Uji Parser SMS Shortcuts').click();
-  await expect(screen.getByText('Uji Coba Otomatisasi SMS Bank (FR-22)')).toBeVisible();
+  await expect(screen.getByText('Uji Coba Otomatisasi SMS Bank')).toBeVisible();
 
   // Click Kirim & Ekstraksi ke Inbox Draft
   await expect(screen.getByRole('button', { name: /Tempel Clipboard/i })).toBeVisible();

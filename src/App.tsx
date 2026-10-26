@@ -15,6 +15,11 @@ const AppContent: React.FC = () => {
   const { activeTab, openCatat } = useApp();
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+    document.querySelector('main')?.scrollTo(0, 0);
+  }, [activeTab]);
+
+  useEffect(() => {
     const pending = consumePendingUpload();
     if (pending) {
       openCatat(pending);

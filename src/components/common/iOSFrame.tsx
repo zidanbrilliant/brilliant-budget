@@ -42,7 +42,7 @@ export const IOSFrame: React.FC<IOSFrameProps> = ({ children }) => {
             {/* 3-Mode Theme Cycler: Pink Cute -> Light -> Dark */}
             <button
               onClick={cycleTheme}
-              className={`w-9 h-9 rounded-xl flex items-center justify-center transition active:scale-95 ${isPinkTheme ? 'text-pink-600 hover:bg-pink-100/60' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+              className={`w-10 h-10 rounded-xl flex items-center justify-center transition active:scale-95 ${isPinkTheme ? 'text-pink-600 hover:bg-pink-100/60' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'}`}
               title={`Ganti Tema (Aktif: ${settings.theme === 'pink' ? 'Soft Pink Cute' : settings.theme === 'light' ? 'Minimalist Light' : 'Midnight Dark'})`}
               aria-label="Ganti Tema"
             >

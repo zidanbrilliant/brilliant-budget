@@ -67,72 +67,72 @@ export const BerandaView: React.FC = () => {
   return (
     <div className="px-5 py-4 space-y-6">
       {/* 1. HERO: Balance & Budget Card */}
-      <section className={`rounded-3xl p-5 border shadow-sm ${
+      <section className={`rounded-3xl p-5 shadow-sm ${
         isPinkTheme
-          ? 'bg-white/95 border-pink-200/80 shadow-pink-100/40'
-          : 'bg-white dark:bg-[#151E2E] border-slate-200/80 dark:border-slate-800/80'
+          ? 'bg-gradient-to-br from-[#E11D48] to-[#BE123C] text-white shadow-rose-200/50'
+          : 'bg-[#0F172A] dark:bg-[#111827] text-white border border-slate-800'
       }`}>
-        <div className="flex items-center justify-between text-xs font-medium">
-          <span className={`uppercase tracking-wider font-bold text-xs ${isPinkTheme ? 'text-pink-600/90' : 'text-slate-400'}`}>
+        <div className="flex items-center justify-between gap-2">
+          <span className={`uppercase tracking-wider font-bold text-[11px] ${isPinkTheme ? 'text-pink-100' : 'text-slate-400'}`}>
             {isPinkTheme ? 'Sisa Anggaran Bulan Ini ✨' : 'Sisa Anggaran Bulan Ini'}
           </span>
           <span
-            className={`px-2.5 py-1 rounded-full text-xs font-bold tabular-nums ${
+            className={`px-2.5 py-1 rounded-full text-[11px] font-bold tabular-nums border shrink-0 ${
               isBudgetExceeded
-                ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400'
+                ? 'bg-rose-500/25 text-rose-100 border-rose-300/40'
                 : isBudgetWarning
-                ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400'
+                ? 'bg-amber-400/20 text-amber-100 border-amber-300/40'
                 : isPinkTheme
-                ? 'bg-pink-100 text-pink-700 font-extrabold'
-                : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
+                ? 'bg-white/15 text-white border-white/20'
+                : 'bg-emerald-400/15 text-emerald-200 border-emerald-300/30'
             }`}
           >
             {budgetSpentPercent}% terpakai
           </span>
         </div>
 
-        {/* Large Crisp Title Typography */}
-        <div className={`mt-2 text-3xl sm:text-4xl font-extrabold tracking-tight tabular-nums ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
+        <div className="mt-2 text-3xl sm:text-4xl font-extrabold tracking-tight tabular-nums truncate">
           {formatIDR(summary.remainingBudget)}
         </div>
+        <div className={`text-[11px] mt-0.5 tabular-nums ${isPinkTheme ? 'text-pink-100/90' : 'text-slate-400'}`}>
+          dari {formatIDR(totalBudget)}
+        </div>
 
-        {/* Minimalist Micro Progress Line */}
-        <div className={`w-full ${isPinkTheme ? 'bg-pink-100' : 'bg-slate-100 dark:bg-slate-800'} rounded-full h-2.5 mt-3.5 overflow-hidden`}>
+        <div className={`w-full ${isPinkTheme ? 'bg-black/20' : 'bg-slate-800'} rounded-full h-2.5 mt-3.5 overflow-hidden`}>
           <div
             className={`h-full rounded-full transition-all duration-300 ${
               isBudgetExceeded
-                ? 'bg-rose-500'
+                ? 'bg-rose-300'
                 : isBudgetWarning
-                ? 'bg-amber-500'
+                ? 'bg-amber-300'
                 : isPinkTheme
-                ? 'bg-gradient-to-r from-pink-400 to-rose-500'
-                : 'bg-emerald-500'
+                ? 'bg-white'
+                : 'bg-emerald-400'
             }`}
             style={{ width: `${budgetSpentPercent}%` }}
           ></div>
         </div>
 
-        {/* Cash Flow Summary Row */}
-        <div className={`grid grid-cols-2 gap-4 mt-5 pt-4 border-t ${isPinkTheme ? 'border-pink-100' : 'border-slate-100 dark:border-slate-800/80'}`}>
-          <div className="flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-xl ${isPinkTheme ? 'bg-rose-50 text-rose-600' : 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400'} flex items-center justify-center shrink-0`}>
+        <div className={`grid grid-cols-2 gap-3 mt-5 pt-4 border-t ${isPinkTheme ? 'border-white/15' : 'border-white/10'}`}>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isPinkTheme ? 'bg-white/10 text-white' : 'bg-rose-500/15 text-rose-300'}`}>
               <ArrowUpRight className="w-4 h-4 stroke-[2.2]" />
             </div>
-            <div>
-              <div className={`text-xs font-semibold ${isPinkTheme ? 'text-pink-600/70' : 'text-slate-400'}`}>Pengeluaran</div>
-              <div className={`text-sm sm:text-base font-bold tabular-nums ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
+            <div className="min-w-0">
+              <div className={`text-[11px] font-semibold ${isPinkTheme ? 'text-pink-100/80' : 'text-slate-400'}`}>Pengeluaran</div>
+              <div className="text-sm font-bold tabular-nums truncate text-white">
                 {formatIDR(summary.expense)}
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-xl ${isPinkTheme ? 'bg-pink-50 text-pink-600' : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400'} flex items-center justify-center shrink-0`}>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isPinkTheme ? 'bg-white/10 text-emerald-200' : 'bg-emerald-500/15 text-emerald-300'}`}>
               <ArrowDownLeft className="w-4 h-4 stroke-[2.2]" />
             </div>
-            <div>
-              <div className={`text-xs font-semibold ${isPinkTheme ? 'text-pink-600/70' : 'text-slate-400'}`}>Pemasukan</div>
-              <div className={`text-sm sm:text-base font-bold tabular-nums ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
+            <div className="min-w-0">
+              <div className={`text-[11px] font-semibold ${isPinkTheme ? 'text-pink-100/80' : 'text-slate-400'}`}>Pemasukan</div>
+              <div className={`text-sm font-bold tabular-nums truncate ${isPinkTheme ? 'text-emerald-100' : 'text-emerald-300'}`}>
                 {formatIDR(summary.income)}
               </div>
             </div>

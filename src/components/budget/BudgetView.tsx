@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatIDR, formatCompactIDR } from '../../utils/formatters';
 import { AppIcon } from '../common/IconHelper';
@@ -93,7 +93,53 @@ export const BudgetView: React.FC = () => {
 
   const isPinkTheme = settings.theme === 'pink';
 
+  const modalSurface = isPinkTheme
+    ? 'bg-[#FFF5F7] border-pink-200 text-[#37131D]'
+    : 'bg-white dark:bg-[#151E2E] border-slate-200 dark:border-slate-800';
+  const modalCard = `rounded-2xl p-5 max-w-sm w-full shadow-2xl border animate-scale-up ${modalSurface}`;
+  const fieldClass = `w-full px-3 py-2 rounded-xl border outline-none transition ${
+    isPinkTheme
+      ? 'bg-white border-pink-200 text-[#37131D] placeholder:text-pink-300 focus:border-pink-400'
+      : 'bg-slate-100 dark:bg-slate-800 border-transparent text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:border-slate-300 dark:focus:border-slate-600'
+  }`;
+  const labelClass = `text-[11px] font-bold uppercase block mb-1 ${
+    isPinkTheme ? 'text-pink-500/80' : 'text-slate-400'
+  }`;
+  const modalTitle = `font-bold text-sm ${
+    isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'
+  }`;
+  const primaryBtn = `text-white transition active:scale-[0.98] ${
+    isPinkTheme
+      ? 'bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 shadow-xs shadow-rose-200'
+      : 'bg-emerald-600 hover:bg-emerald-500 shadow-xs'
+  }`;
+  const secondaryBtn = `transition active:scale-[0.98] ${
+    isPinkTheme
+      ? 'bg-pink-100 text-pink-700 hover:bg-pink-200'
+      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+  }`;
+  const dangerBtn = `transition active:scale-[0.98] ${
+    isPinkTheme
+      ? 'text-rose-600 bg-rose-100/70 hover:bg-rose-200/70'
+      : 'text-rose-600 bg-rose-50 dark:text-rose-400 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-950/60'
+  }`;
+  const methodCard = (active: boolean) =>
+    `p-2.5 rounded-xl border text-left font-semibold transition active:scale-[0.98] ${
+      active
+        ? isPinkTheme
+          ? 'border-pink-400 bg-pink-100/80 text-pink-700'
+          : 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300'
+        : isPinkTheme
+        ? 'border-pink-200/80 bg-white text-[#37131D] hover:border-pink-300'
+        : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+    }`;
+
   const [activeTab, setActiveTab] = useState<'budget' | 'recurring' | 'goals'>('budget');
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.querySelector('main')?.scrollTo(0, 0);
+  }, [activeTab]);
   const [isEditingBudgetModal, setIsEditingBudgetModal] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<BudgetMethod>(budget.method);
   const [totalLimitInput, setTotalLimitInput] = useState<number>(budget.total_limit);
@@ -479,7 +525,7 @@ export const BudgetView: React.FC = () => {
             isPinkTheme
               ? 'bg-gradient-to-br from-[#E11D48] to-[#BE123C] text-white shadow-rose-200/50'
               : 'bg-[#0F172A] dark:bg-[#111827] text-white border border-slate-800'
-          } p-4.5 rounded-2xl shadow-xs space-y-3.5`}>
+          } p-4 rounded-2xl shadow-xs space-y-3.5`}>
             <div className={`flex items-center justify-between ${isPinkTheme ? 'text-pink-100' : 'text-slate-400'} text-[11px] font-semibold`}>
               <span className="uppercase tracking-wider">Budget Bulanan</span>
               <span className={`px-2 py-0.5 rounded-full ${isPinkTheme ? 'bg-white/15' : 'bg-white/10'}`}>
@@ -503,6 +549,8 @@ export const BudgetView: React.FC = () => {
                     ? 'bg-rose-500/25 text-rose-100 border border-rose-400/40'
                     : spentPercent >= 80
                     ? 'bg-amber-400/20 text-amber-100 border border-amber-300/40'
+                    : isPinkTheme
+                    ? 'bg-white/15 text-white border border-white/20'
                     : 'bg-emerald-400/20 text-emerald-100 border border-emerald-300/40'
                 }`}
               >
@@ -518,6 +566,8 @@ export const BudgetView: React.FC = () => {
                     ? 'bg-rose-400'
                     : spentPercent >= 80
                     ? 'bg-amber-300'
+                    : isPinkTheme
+                    ? 'bg-white'
                     : 'bg-emerald-400'
                 }`}
                 style={{ width: `${spentPercent}%` }}
@@ -676,7 +726,7 @@ export const BudgetView: React.FC = () => {
                               {line.name || cat?.name}
                             </span>
                             {line.rollover && (
-                              <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                              <span className={`text-[9px] font-semibold ${isPinkTheme ? 'text-pink-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                 Rollover Aktif
                               </span>
                             )}
@@ -722,9 +772,9 @@ export const BudgetView: React.FC = () => {
             <div className="flex items-end justify-between gap-2 mt-1">
               <div className="min-w-0">
                 <span className="text-2xl font-black tabular-nums">{formatIDR(monthlySubCost)}</span>
-                <span className="text-xs text-slate-400 ml-1">/ bulan</span>
+                <span className={`text-xs ml-1 ${isPinkTheme ? 'text-pink-100/80' : 'text-slate-400'}`}>/ bulan</span>
               </div>
-              <div className="text-[11px] text-slate-400 tabular-nums text-right shrink-0">
+              <div className={`text-[11px] tabular-nums text-right shrink-0 ${isPinkTheme ? 'text-pink-100/80' : 'text-slate-400'}`}>
                 <div>{subscriptions.length} langganan</div>
                 <div>≈ {formatCompactIDR(annualSubCost)} / thn</div>
               </div>
@@ -770,75 +820,76 @@ export const BudgetView: React.FC = () => {
                   return (
                     <div
                       key={rule.id}
-                      className={`p-3.5 flex items-start justify-between gap-2 ${rule.is_active ? '' : 'opacity-60'}`}
+                      className={`p-3.5 flex items-center gap-3 ${rule.is_active ? '' : 'opacity-60'}`}
                     >
-                      <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                        <div
-                          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-white"
-                          style={{ backgroundColor: cat?.color || '#64748B' }}
-                        >
-                          <AppIcon name={cat?.icon || 'Repeat'} className="w-4 h-4 text-white" />
-                        </div>
-                        <div className="min-w-0 flex-1">
+                      <div
+                        className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-white shadow-2xs"
+                        style={{ backgroundColor: cat?.color || '#64748B' }}
+                      >
+                        <AppIcon name={cat?.icon || 'Repeat'} className="w-4 h-4 text-white" />
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-2">
                           <div className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
                             {rule.name}
                           </div>
-                          <div className="text-[11px] text-slate-400 flex items-center flex-wrap gap-x-1.5 gap-y-0.5 mt-0.5">
-                            <span>Tiap tgl {rule.day_of_month || 1}</span>
-                            <span>•</span>
-                            <span>{cat?.name || (rule.type === 'income' ? 'Pemasukan' : 'Pengeluaran')}</span>
+                          <div className={`text-xs font-bold tabular-nums shrink-0 ${rule.type === 'income' ? 'text-emerald-600' : 'text-slate-900 dark:text-white'}`}>
+                            {rule.type === 'income' ? '+' : ''}{formatIDR(rule.amount)}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 mt-1">
+                          <div className="text-[11px] text-slate-400 flex items-center gap-1 min-w-0">
+                            <span className="truncate">
+                              Tiap tgl {rule.day_of_month || 1} · {cat?.name || (rule.type === 'income' ? 'Pemasukan' : 'Pengeluaran')}
+                            </span>
                             {rule.total_tenor && (
-                              <>
-                                <span>•</span>
-                                <span className="font-semibold text-emerald-600">
-                                  Tenor {rule.remaining_tenor}/{rule.total_tenor}
-                                </span>
-                              </>
+                              <span className={`shrink-0 text-[9px] font-bold ${isPinkTheme ? 'text-pink-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                {rule.remaining_tenor}/{rule.total_tenor}
+                              </span>
                             )}
                             {!rule.is_active && (
-                              <span className="text-[9px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                              <span className="shrink-0 text-[9px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
                                 Nonaktif
                               </span>
                             )}
                           </div>
-                        </div>
-                      </div>
 
-                      <div className="text-right shrink-0">
-                        <div className={`text-xs font-bold tabular-nums ${rule.type === 'income' ? 'text-emerald-600' : 'text-slate-900 dark:text-white'}`}>
-                          {rule.type === 'income' ? '+' : ''}{formatIDR(rule.amount)}
-                        </div>
-                        <span
-                          title={
-                            rule.mode === 'auto'
-                              ? 'Otomatis: transaksi langsung dicatat saat jatuh tempo.'
-                              : 'Draft: transaksi masuk draf dan perlu dikonfirmasi di Beranda.'
-                          }
-                          className={`inline-block mt-0.5 text-[9px] px-1.5 py-0.5 rounded font-semibold cursor-help ${
-                            rule.mode === 'auto'
-                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300'
-                              : 'bg-amber-50 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300'
-                          }`}
-                        >
-                          {rule.mode === 'auto' ? 'Otomatis' : 'Draft'}
-                        </span>
-                        <div className="flex items-center justify-end gap-1 mt-1">
-                          <button
-                            onClick={() => openEditRecurring(rule)}
-                            aria-label={`Edit ${rule.name}`}
-                            title="Edit"
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteRecurring(rule)}
-                            aria-label={`Hapus ${rule.name}`}
-                            title="Hapus"
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center gap-0.5 shrink-0 -mr-1">
+                            <span
+                              title={
+                                rule.mode === 'auto'
+                                  ? 'Otomatis: transaksi langsung dicatat saat jatuh tempo.'
+                                  : 'Draft: transaksi masuk draf dan perlu dikonfirmasi di Beranda.'
+                              }
+                              className={`text-[9px] px-1.5 py-0.5 rounded font-semibold cursor-help ${
+                                rule.mode === 'auto'
+                                  ? isPinkTheme
+                                    ? 'bg-pink-50 text-pink-600'
+                                    : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300'
+                                  : 'bg-amber-50 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300'
+                              }`}
+                            >
+                              {rule.mode === 'auto' ? 'Otomatis' : 'Draft'}
+                            </span>
+                            <button
+                              onClick={() => openEditRecurring(rule)}
+                              aria-label={`Edit ${rule.name}`}
+                              title="Edit"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteRecurring(rule)}
+                              aria-label={`Hapus ${rule.name}`}
+                              title="Hapus"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1109,52 +1160,43 @@ export const BudgetView: React.FC = () => {
       {/* Edit Budget Modal */}
       {isEditingBudgetModal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#151E2E] rounded-2xl p-5 max-w-sm w-full space-y-3.5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-              Metode Anggaran
-            </h3>
+          <div className={`${modalCard} max-h-[90vh] flex flex-col`}>
+            <div className="shrink-0">
+              <h3 className={modalTitle}>Metode Anggaran</h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Pilih gaya budgeting dan atur batas bulananmu.
+              </p>
+            </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="flex-1 overflow-y-auto mt-3 pr-1 space-y-3 text-xs scrollbar-none">
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1.5">Pilih Gaya Budgeting</label>
+                <label className={labelClass}>Pilih Gaya Budgeting</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => setSelectedMethod('category')}
-                    className={`p-2.5 rounded-xl border text-left font-semibold ${
-                      selectedMethod === 'category'
-                        ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-                        : 'border-slate-200 dark:border-slate-700'
-                    }`}
+                    aria-pressed={selectedMethod === 'category'}
+                    className={methodCard(selectedMethod === 'category')}
                   >
                     Per Kategori
                   </button>
                   <button
                     onClick={() => setSelectedMethod('percent')}
-                    className={`p-2.5 rounded-xl border text-left font-semibold ${
-                      selectedMethod === 'percent'
-                        ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-                        : 'border-slate-200 dark:border-slate-700'
-                    }`}
+                    aria-pressed={selectedMethod === 'percent'}
+                    className={methodCard(selectedMethod === 'percent')}
                   >
                     Aturan 50/30/20
                   </button>
                   <button
                     onClick={() => setSelectedMethod('envelope')}
-                    className={`p-2.5 rounded-xl border text-left font-semibold ${
-                      selectedMethod === 'envelope'
-                        ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-                        : 'border-slate-200 dark:border-slate-700'
-                    }`}
+                    aria-pressed={selectedMethod === 'envelope'}
+                    className={methodCard(selectedMethod === 'envelope')}
                   >
                     Sistem Amplop
                   </button>
                   <button
                     onClick={() => setSelectedMethod('total')}
-                    className={`p-2.5 rounded-xl border text-left font-semibold ${
-                      selectedMethod === 'total'
-                        ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
-                        : 'border-slate-200 dark:border-slate-700'
-                    }`}
+                    aria-pressed={selectedMethod === 'total'}
+                    className={methodCard(selectedMethod === 'total')}
                   >
                     Batas Total
                   </button>
@@ -1165,7 +1207,7 @@ export const BudgetView: React.FC = () => {
               {selectedMethod === 'category' || selectedMethod === 'envelope' ? (
                 <div className="space-y-2.5">
                   <div>
-                    <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">
+                    <label className={labelClass}>
                       Batas Budget Bulanan (Rp)
                     </label>
                     <input
@@ -1174,7 +1216,7 @@ export const BudgetView: React.FC = () => {
                       value={totalLimitInput || ''}
                       onChange={e => setTotalLimitInput(Math.max(0, Number(e.target.value)))}
                       placeholder="Mis. 5000000"
-                      className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm font-bold outline-none tabular-nums"
+                      className={`${fieldClass} text-sm font-bold tabular-nums`}
                     />
                     <div className="flex items-center justify-between gap-2 mt-1 text-[10px]">
                       <span className="text-slate-400">
@@ -1200,7 +1242,7 @@ export const BudgetView: React.FC = () => {
                         Total kategori melebihi jatah. Kurangi nominal atau naikkan budget bulanan.
                       </p>
                     )}
-                    <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1 scrollbar-none">
+                    <div className="space-y-1.5">
                       {expenseCategories.map(c => (
                         <div
                           key={c.id}
@@ -1240,7 +1282,7 @@ export const BudgetView: React.FC = () => {
                 </div>
               ) : (
                 <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">
+                  <label className={labelClass}>
                     Batas Bulanan (Rp)
                   </label>
                   <input
@@ -1249,22 +1291,22 @@ export const BudgetView: React.FC = () => {
                     value={totalLimitInput || ''}
                     placeholder="Mis. 5000000"
                     onChange={e => setTotalLimitInput(Math.max(0, Number(e.target.value)))}
-                    className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm font-bold outline-none tabular-nums"
+                    className={`${fieldClass} text-sm font-bold tabular-nums`}
                   />
                 </div>
               )}
             </div>
 
-            <div className="flex gap-2 pt-1">
+            <div className="flex gap-2 pt-3 shrink-0">
               <button
                 onClick={() => setIsEditingBudgetModal(false)}
-                className="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300"
+                className={`flex-1 py-2 rounded-xl text-xs font-bold ${secondaryBtn}`}
               >
                 Batal
               </button>
               <button
                 onClick={handleSaveBudget}
-                className={`flex-1 py-2 rounded-xl text-white text-xs font-bold transition ${isPinkTheme ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-600 hover:bg-emerald-500'}`}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold ${primaryBtn}`}
               >
                 Simpan
               </button>
@@ -1276,18 +1318,27 @@ export const BudgetView: React.FC = () => {
       {/* Quick Edit Single Category Line Modal */}
       {editingLineCatId && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#151E2E] rounded-2xl p-5 max-w-sm w-full space-y-3.5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-                Sesuaikan Anggaran Kategori
-              </h3>
-              <button onClick={() => setEditingLineCatId(null)} className="text-slate-400 hover:text-slate-600">
+          <div className={`${modalCard} space-y-3.5`}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className={modalTitle}>
+                  Sesuaikan Anggaran Kategori
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Atur batas pengeluaran khusus kategori ini.
+                </p>
+              </div>
+              <button
+                onClick={() => setEditingLineCatId(null)}
+                aria-label="Tutup"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className={`p-3 rounded-xl flex items-center gap-2.5 ${isPinkTheme ? 'bg-pink-50' : 'bg-slate-50 dark:bg-slate-800/60'}`}>
+              <div className={`p-3 rounded-xl flex items-center gap-2.5 border ${isPinkTheme ? 'bg-pink-50 border-pink-100' : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200/60 dark:border-slate-700/60'}`}>
                 <div
                   className="w-8 h-8 rounded-xl flex items-center justify-center text-white"
                   style={{ backgroundColor: categories.find(c => c.id === editingLineCatId)?.color || '#FB7185' }}
@@ -1298,12 +1349,12 @@ export const BudgetView: React.FC = () => {
                   <div className={`font-bold ${isPinkTheme ? 'text-pink-900' : 'text-slate-900 dark:text-white'}`}>
                     {categories.find(c => c.id === editingLineCatId)?.name}
                   </div>
-                  <div className="text-[10px] text-slate-400">Atur batas pengeluaran khusus kategori ini</div>
+                  <div className="text-[10px] text-slate-400">Batas bulanan saat ini</div>
                 </div>
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">
+                <label className={labelClass}>
                   Nominal Anggaran Bulanan (Rp)
                 </label>
                 <input
@@ -1312,7 +1363,7 @@ export const BudgetView: React.FC = () => {
                   value={editingLineAmount || ''}
                   placeholder="0"
                   onChange={e => setEditingLineAmount(Math.max(0, Number(e.target.value)))}
-                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-base font-bold outline-none tabular-nums"
+                  className={`${fieldClass} text-base font-bold tabular-nums`}
                 />
                 <p className="text-[10px] text-slate-400 mt-1">
                   Maksimal untuk semua kategori: {formatIDR(Math.max(0, totalBudget - monthlyCommittedCost))}
@@ -1324,7 +1375,7 @@ export const BudgetView: React.FC = () => {
                   type="checkbox"
                   checked={editingLineRollover}
                   onChange={e => setEditingLineRollover(e.target.checked)}
-                  className="rounded text-rose-500 w-4 h-4"
+                  className={`w-4 h-4 ${isPinkTheme ? 'accent-rose-500' : 'accent-emerald-600'}`}
                 />
                 <span className="font-medium text-slate-700 dark:text-slate-300 text-xs">
                   Rollover sisa anggaran ke bulan berikutnya
@@ -1335,13 +1386,13 @@ export const BudgetView: React.FC = () => {
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => handleRemoveLine(editingLineCatId)}
-                className="px-3 py-2 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 transition"
+                className={`px-3 py-2 rounded-xl text-xs font-bold ${dangerBtn}`}
               >
                 Hapus
               </button>
               <button
                 onClick={handleSaveQuickLine}
-                className={`flex-1 py-2 rounded-xl text-white text-xs font-bold transition shadow-xs ${isPinkTheme ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-600 hover:bg-emerald-500'}`}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold ${primaryBtn}`}
               >
                 Simpan Nominal
               </button>
@@ -1353,34 +1404,39 @@ export const BudgetView: React.FC = () => {
       {/* New Goal Modal */}
       {isGoalModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#151E2E] rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-              Target Tabungan Baru
-            </h3>
+          <div className={`${modalCard} space-y-4`}>
+            <div>
+              <h3 className={modalTitle}>
+                Target Tabungan Baru
+              </h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Tentukan impian dan nominal yang ingin dicapai.
+              </p>
+            </div>
             <div className="space-y-3 text-xs">
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nama Target</label>
+                <label className={labelClass}>Nama Target</label>
                 <input
                   type="text"
                   value={goalName}
                   onChange={e => setGoalName(e.target.value)}
                   placeholder="Mis. Dana Darurat, Liburan"
-                  className="w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-semibold"
+                  className={`${fieldClass} text-xs font-semibold`}
                 />
               </div>
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nominal Target (Rp)</label>
+                <label className={labelClass}>Nominal Target (Rp)</label>
                 <input
                   type="number"
                   inputMode="numeric"
                   value={goalTarget || ''}
                   onChange={e => setGoalTarget(Math.max(0, Number(e.target.value)))}
                   placeholder="5000000"
-                  className="w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-bold text-sm tabular-nums"
+                  className={`${fieldClass} text-sm font-bold tabular-nums`}
                 />
               </div>
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">
+                <label className={labelClass}>
                   Tenggat Waktu <span className="normal-case font-medium text-slate-400/80">(opsional)</span>
                 </label>
                 <input
@@ -1388,23 +1444,21 @@ export const BudgetView: React.FC = () => {
                   aria-label="Tenggat waktu"
                   value={goalDueDate}
                   onChange={e => setGoalDueDate(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-semibold text-slate-700 dark:text-slate-200"
+                  className={`${fieldClass} text-xs font-semibold`}
                 />
               </div>
             </div>
             <div className="flex gap-2.5 pt-1">
               <button
                 onClick={() => setIsGoalModalOpen(false)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300 transition"
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${secondaryBtn}`}
               >
                 Batal
               </button>
               <button
                 onClick={handleCreateGoal}
                 disabled={!goalName.trim() || goalTarget <= 0}
-                className={`flex-1 py-2.5 rounded-xl text-white text-xs font-bold transition shadow-xs disabled:opacity-50 ${
-                  isPinkTheme ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-600 hover:bg-emerald-500'
-                }`}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 ${primaryBtn}`}
               >
                 Simpan Target
               </button>
@@ -1416,9 +1470,9 @@ export const BudgetView: React.FC = () => {
       {/* Modal Setor Tabungan (Nominal Custom & Pilih Dompet) */}
       {contributeGoal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#151E2E] rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
+          <div className={`${modalCard} space-y-4`}>
             <div>
-              <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+              <h3 className={modalTitle}>
                 Setor ke: {contributeGoal.name}
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -1428,7 +1482,7 @@ export const BudgetView: React.FC = () => {
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">
+                <label className={labelClass}>
                   Nominal Setor (Rp)
                 </label>
                 <input
@@ -1437,7 +1491,7 @@ export const BudgetView: React.FC = () => {
                   value={contributeAmount || ''}
                   onChange={e => setContributeAmount(Math.max(0, Number(e.target.value)))}
                   placeholder="Masukkan nominal bebas"
-                  className="w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-bold text-base tabular-nums"
+                  className={`${fieldClass} text-base font-bold tabular-nums`}
                 />
               </div>
 
@@ -1457,6 +1511,8 @@ export const BudgetView: React.FC = () => {
                           ? isPinkTheme
                             ? 'bg-rose-500 text-white border-rose-500'
                             : 'bg-emerald-600 text-white border-emerald-600'
+                          : isPinkTheme
+                          ? 'border-pink-200 bg-white text-pink-700 hover:border-pink-300'
                           : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                       }`}
                     >
@@ -1468,13 +1524,13 @@ export const BudgetView: React.FC = () => {
 
               {/* Source Account Selector */}
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">
+                <label className={labelClass}>
                   Potong Dari Dompet
                 </label>
                 <select
                   value={contributeAccountId}
                   onChange={e => setContributeAccountId(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-semibold text-xs border border-transparent focus:border-slate-300 dark:focus:border-slate-600"
+                  className={`${fieldClass} py-2.5 font-semibold text-xs`}
                 >
                   {accounts.map(acc => {
                     return (
@@ -1490,16 +1546,14 @@ export const BudgetView: React.FC = () => {
             <div className="flex gap-2.5 pt-1">
               <button
                 onClick={() => setContributeGoal(null)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300 transition"
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${secondaryBtn}`}
               >
                 Batal
               </button>
               <button
                 onClick={handleConfirmContribute}
                 disabled={contributeAmount <= 0}
-                className={`flex-1 py-2.5 rounded-xl text-white text-xs font-bold transition shadow-xs disabled:opacity-50 ${
-                  isPinkTheme ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-600 hover:bg-emerald-500'
-                }`}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 ${primaryBtn}`}
               >
                 Konfirmasi Setor
               </button>
@@ -1511,14 +1565,19 @@ export const BudgetView: React.FC = () => {
       {/* Modal Edit Target Tabungan */}
       {editingGoal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#151E2E] rounded-3xl p-5 max-w-sm w-full space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-              Edit Target Tabungan
-            </h3>
+          <div className={`${modalCard} space-y-4`}>
+            <div>
+              <h3 className={modalTitle}>
+                Edit Target Tabungan
+              </h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Perbarui nama, nominal, atau tenggat target.
+              </p>
+            </div>
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">
+                <label className={labelClass}>
                   Nama Target
                 </label>
                 <input
@@ -1526,12 +1585,12 @@ export const BudgetView: React.FC = () => {
                   value={editGoalName}
                   onChange={e => setEditGoalName(e.target.value)}
                   placeholder="Mis. Dana Darurat, Beli HP"
-                  className="w-full px-3.5 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-semibold text-xs"
+                  className={`${fieldClass} text-xs font-semibold`}
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">
+                <label className={labelClass}>
                   Nominal Target (Rp)
                 </label>
                 <input
@@ -1539,12 +1598,12 @@ export const BudgetView: React.FC = () => {
                   inputMode="numeric"
                   value={editGoalTarget || ''}
                   onChange={e => setEditGoalTarget(Math.max(0, Number(e.target.value)))}
-                  className="w-full px-3.5 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-bold text-sm tabular-nums"
+                  className={`${fieldClass} text-sm font-bold tabular-nums`}
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">
+                <label className={labelClass}>
                   Tenggat Waktu <span className="normal-case font-medium text-slate-400/80">(opsional)</span>
                 </label>
                 <input
@@ -1552,12 +1611,16 @@ export const BudgetView: React.FC = () => {
                   aria-label="Tenggat waktu"
                   value={editGoalDueDate}
                   onChange={e => setEditGoalDueDate(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-xs font-semibold text-slate-700 dark:text-slate-200"
+                  className={`${fieldClass} text-xs font-semibold`}
                 />
               </div>
 
-              <div className="text-slate-400 text-[11px] bg-slate-50 dark:bg-slate-800/50 p-2.5 rounded-xl border border-slate-200/50 dark:border-slate-800">
-                Terkumpul saat ini: <span className="font-bold text-slate-700 dark:text-slate-200">{formatIDR(editingGoal.saved_amount)}</span>
+              <div className={`text-[11px] p-2.5 rounded-xl border ${
+                isPinkTheme
+                  ? 'text-pink-600/80 bg-pink-50 border-pink-100'
+                  : 'text-slate-400 bg-slate-50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-800'
+              }`}>
+                Terkumpul saat ini: <span className={`font-bold ${isPinkTheme ? 'text-pink-800' : 'text-slate-700 dark:text-slate-200'}`}>{formatIDR(editingGoal.saved_amount)}</span>
               </div>
             </div>
 
@@ -1565,14 +1628,14 @@ export const BudgetView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleDeleteGoal(editingGoal.id)}
-                className="py-2.5 px-3 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 text-xs font-bold hover:bg-rose-100 transition"
+                className={`py-2.5 px-3 rounded-xl text-xs font-bold ${dangerBtn}`}
               >
                 Hapus
               </button>
               <button
                 type="button"
                 onClick={() => setEditingGoal(null)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300"
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${secondaryBtn}`}
               >
                 Batal
               </button>
@@ -1580,9 +1643,7 @@ export const BudgetView: React.FC = () => {
                 type="button"
                 onClick={handleUpdateGoal}
                 disabled={!editGoalName.trim() || editGoalTarget <= 0}
-                className={`flex-1 py-2.5 rounded-xl text-white text-xs font-bold transition shadow-xs disabled:opacity-50 ${
-                  isPinkTheme ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-600 hover:bg-emerald-500'
-                }`}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 ${primaryBtn}`}
               >
                 Simpan
               </button>
@@ -1594,10 +1655,10 @@ export const BudgetView: React.FC = () => {
       {/* Add / Edit Recurring Modal */}
       {isAddRecurringOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#151E2E] rounded-3xl p-5 max-w-sm w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
-            <div className="flex items-center justify-between shrink-0">
+          <div className={`${modalCard} max-h-[90vh] flex flex-col`}>
+            <div className="flex items-start justify-between gap-3 shrink-0">
               <div>
-                <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                <h3 className={modalTitle}>
                   {editingRecurringId ? 'Edit Langganan / Rutinitas' : 'Tambah Langganan / Rutinitas'}
                 </h3>
                 <p className="text-[10px] text-slate-400 mt-0.5">
@@ -1607,7 +1668,7 @@ export const BudgetView: React.FC = () => {
               <button
                 onClick={() => setIsAddRecurringOpen(false)}
                 aria-label="Tutup"
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1616,8 +1677,8 @@ export const BudgetView: React.FC = () => {
             <div className="space-y-3 text-xs overflow-y-auto pr-1 mt-3 scrollbar-none">
               {/* Jenis transaksi */}
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Jenis Transaksi</label>
-                <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                <label className={labelClass}>Jenis Transaksi</label>
+                <div className={`flex p-1 rounded-xl ${isPinkTheme ? 'bg-pink-100/70' : 'bg-slate-100 dark:bg-slate-800'}`}>
                   <button
                     type="button"
                     onClick={() => {
@@ -1625,7 +1686,9 @@ export const BudgetView: React.FC = () => {
                       setRecCategory(categories.find(c => c.kind === 'expense')?.id || 'cat-lainnya');
                     }}
                     className={`flex-1 py-2 rounded-lg font-bold text-[11px] transition ${
-                      recType === 'expense' ? 'bg-white dark:bg-slate-700 text-rose-600 shadow-xs' : 'text-slate-500'
+                      recType === 'expense'
+                        ? `bg-white dark:bg-slate-700 shadow-2xs ${isPinkTheme ? 'text-rose-600' : 'text-rose-600'}`
+                        : 'text-slate-500 dark:text-slate-400'
                     }`}
                   >
                     Pengeluaran
@@ -1638,7 +1701,9 @@ export const BudgetView: React.FC = () => {
                       setRecCategory(categories.find(c => c.kind === 'income')?.id || 'cat-gaji');
                     }}
                     className={`flex-1 py-2 rounded-lg font-bold text-[11px] transition ${
-                      recType === 'income' ? 'bg-white dark:bg-slate-700 text-emerald-600 shadow-xs' : 'text-slate-500'
+                      recType === 'income'
+                        ? 'bg-white dark:bg-slate-700 text-emerald-600 shadow-2xs'
+                        : 'text-slate-500 dark:text-slate-400'
                     }`}
                   >
                     Pemasukan
@@ -1647,30 +1712,30 @@ export const BudgetView: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nama</label>
+                <label className={labelClass}>Nama</label>
                 <input
                   type="text"
                   value={recName}
                   onChange={e => setRecName(e.target.value)}
                   placeholder={recType === 'income' ? 'Mis. Gaji Pokok, Bonus' : 'Mis. Spotify, iCloud, BPJS'}
-                  className="w-full px-3 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-base sm:text-xs font-semibold"
+                  className={`${fieldClass} py-2.5 text-base sm:text-xs font-semibold`}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nominal (Rp)</label>
+                  <label className={labelClass}>Nominal (Rp)</label>
                   <input
                     type="number"
                     inputMode="numeric"
                     value={recAmount || ''}
                     placeholder="0"
                     onChange={e => setRecAmount(Math.max(0, Number(e.target.value)))}
-                    className="w-full px-3 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-bold tabular-nums"
+                    className={`${fieldClass} py-2.5 font-bold tabular-nums`}
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Tanggal</label>
+                  <label className={labelClass}>Tanggal</label>
                   <input
                     type="number"
                     inputMode="numeric"
@@ -1679,18 +1744,18 @@ export const BudgetView: React.FC = () => {
                     value={recDay || ''}
                     placeholder="1"
                     onChange={e => setRecDay(Math.min(31, Math.max(1, Number(e.target.value) || 1)))}
-                    className="w-full px-3 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none tabular-nums"
+                    className={`${fieldClass} py-2.5 tabular-nums`}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Dompet</label>
+                  <label className={labelClass}>Dompet</label>
                   <select
                     value={recAccount}
                     onChange={e => setRecAccount(e.target.value)}
-                    className="w-full px-2.5 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-semibold text-xs"
+                    className={`${fieldClass} px-2.5 py-2.5 font-semibold text-xs`}
                   >
                     {accounts.map(a => (
                       <option key={a.id} value={a.id}>{a.name}</option>
@@ -1698,11 +1763,11 @@ export const BudgetView: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Kategori</label>
+                  <label className={labelClass}>Kategori</label>
                   <select
                     value={recCategory}
                     onChange={e => setRecCategory(e.target.value)}
-                    className="w-full px-2.5 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-semibold text-xs"
+                    className={`${fieldClass} px-2.5 py-2.5 font-semibold text-xs`}
                   >
                     {recurringCategories.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
@@ -1713,18 +1778,26 @@ export const BudgetView: React.FC = () => {
 
               {/* Mode pencatatan */}
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Mode Pencatatan</label>
+                <label className={labelClass}>Mode Pencatatan</label>
                 <div className="grid grid-cols-2 gap-1.5">
                   <button
                     type="button"
                     onClick={() => setRecMode('auto')}
-                    className={`p-2.5 rounded-xl border text-left transition ${
+                    className={`p-2.5 rounded-xl border text-left transition active:scale-[0.98] ${
                       recMode === 'auto'
-                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60'
+                        ? isPinkTheme
+                          ? 'border-pink-400 bg-pink-100/80'
+                          : 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60'
+                        : isPinkTheme
+                        ? 'border-pink-200/80 bg-white'
                         : 'border-slate-200 dark:border-slate-700'
                     }`}
                   >
-                    <div className={`font-bold text-[11px] ${recMode === 'auto' ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-600 dark:text-slate-300'}`}>
+                    <div className={`font-bold text-[11px] ${
+                      recMode === 'auto'
+                        ? isPinkTheme ? 'text-pink-700' : 'text-emerald-700 dark:text-emerald-300'
+                        : 'text-slate-600 dark:text-slate-300'
+                    }`}>
                       Otomatis
                     </div>
                     <div className="text-[9px] text-slate-400 mt-0.5 leading-snug">Langsung dicatat saat jatuh tempo</div>
@@ -1732,9 +1805,11 @@ export const BudgetView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setRecMode('draft')}
-                    className={`p-2.5 rounded-xl border text-left transition ${
+                    className={`p-2.5 rounded-xl border text-left transition active:scale-[0.98] ${
                       recMode === 'draft'
                         ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/60'
+                        : isPinkTheme
+                        ? 'border-pink-200/80 bg-white'
                         : 'border-slate-200 dark:border-slate-700'
                     }`}
                   >
@@ -1749,13 +1824,17 @@ export const BudgetView: React.FC = () => {
               {recType === 'expense' && (
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Tipe</label>
-                    <div className="flex gap-1">
+                    <label className={labelClass}>Tipe</label>
+                    <div className={`flex p-1 gap-1 rounded-xl ${isPinkTheme ? 'bg-pink-100/70' : 'bg-slate-100 dark:bg-slate-800'}`}>
                       <button
                         type="button"
                         onClick={() => setRecIsSub(true)}
                         className={`flex-1 py-2 rounded-lg font-bold text-[11px] transition ${
-                          recIsSub ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                          recIsSub
+                            ? isPinkTheme
+                              ? 'bg-white text-pink-700 shadow-2xs'
+                              : 'bg-emerald-600 text-white'
+                            : 'text-slate-500 dark:text-slate-400'
                         }`}
                       >
                         Langganan
@@ -1764,7 +1843,11 @@ export const BudgetView: React.FC = () => {
                         type="button"
                         onClick={() => setRecIsSub(false)}
                         className={`flex-1 py-2 rounded-lg font-bold text-[11px] transition ${
-                          !recIsSub ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                          !recIsSub
+                            ? isPinkTheme
+                              ? 'bg-white text-pink-700 shadow-2xs'
+                              : 'bg-emerald-600 text-white'
+                            : 'text-slate-500 dark:text-slate-400'
                         }`}
                       >
                         Cicilan
@@ -1773,14 +1856,14 @@ export const BudgetView: React.FC = () => {
                   </div>
                   {!recIsSub && (
                     <div>
-                      <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Tenor (Bulan)</label>
+                      <label className={labelClass}>Tenor (Bulan)</label>
                       <input
                         type="number"
                         inputMode="numeric"
                         value={recTenor || ''}
                         placeholder="12"
                         onChange={e => setRecTenor(Math.max(1, Number(e.target.value) || 1))}
-                        className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none tabular-nums"
+                        className={`${fieldClass} py-2 tabular-nums`}
                       />
                     </div>
                   )}
@@ -1791,16 +1874,14 @@ export const BudgetView: React.FC = () => {
             <div className="flex gap-2 pt-3 shrink-0">
               <button
                 onClick={() => setIsAddRecurringOpen(false)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300"
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${secondaryBtn}`}
               >
                 Batal
               </button>
               <button
                 onClick={handleSaveRecurring}
                 disabled={!recName.trim() || recAmount <= 0}
-                className={`flex-1 py-2.5 rounded-xl text-white text-xs font-bold transition disabled:opacity-50 ${
-                  isPinkTheme ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-600 hover:bg-emerald-500'
-                }`}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 ${primaryBtn}`}
               >
                 {editingRecurringId ? 'Simpan Perubahan' : 'Simpan'}
               </button>

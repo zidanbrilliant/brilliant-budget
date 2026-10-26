@@ -594,10 +594,10 @@ export const CatatModal: React.FC = () => {
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5">
           {/* ===================== MODE 1: FORM KETIK MANUAL ===================== */}
           {activeTab === 'manual' && (
-            <div className="space-y-3.5">
+            <div className="space-y-3">
               {/* Type Switcher */}
               <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-semibold">
                 <button
@@ -633,7 +633,7 @@ export const CatatModal: React.FC = () => {
               </div>
 
               {/* Amount Display */}
-              <div className={`relative text-center py-2.5 rounded-2xl border ${isPinkTheme ? 'bg-white border-pink-200/80 shadow-pink-100/30' : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200/60 dark:border-slate-800'}`}>
+              <div className={`relative text-center py-2 rounded-2xl border ${isPinkTheme ? 'bg-white border-pink-200/80 shadow-pink-100/30' : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200/60 dark:border-slate-800'}`}>
                 <span className={`text-[10px] font-bold uppercase tracking-widest ${isPinkTheme ? 'text-pink-600/70' : 'text-slate-400'}`}>
                   Nominal Transaksi (IDR)
                 </span>
@@ -792,7 +792,7 @@ export const CatatModal: React.FC = () => {
                         value={merchant}
                         onChange={e => handleMerchantChange(e.target.value)}
                         placeholder="Toko / Merchant"
-                        className={`w-full px-3 py-2 rounded-xl outline-none border text-base sm:text-xs ${isPinkTheme ? 'bg-white border-pink-200 text-[#37131D]' : 'bg-slate-100 dark:bg-slate-800 border-transparent focus:border-slate-300 dark:focus:border-slate-700'}`}
+                        className={`w-full px-3 py-1.5 rounded-xl outline-none border text-base sm:text-xs ${isPinkTheme ? 'bg-white border-pink-200 text-[#37131D]' : 'bg-slate-100 dark:bg-slate-800 border-transparent focus:border-slate-300 dark:focus:border-slate-700'}`}
                       />
                     </div>
                     <div>
@@ -801,7 +801,7 @@ export const CatatModal: React.FC = () => {
                         value={note}
                         onChange={e => setNote(e.target.value)}
                         placeholder="Catatan (opsional)"
-                        className={`w-full px-3 py-2 rounded-xl outline-none border text-base sm:text-xs ${isPinkTheme ? 'bg-white border-pink-200 text-[#37131D]' : 'bg-slate-100 dark:bg-slate-800 border-transparent focus:border-slate-300 dark:focus:border-slate-700'}`}
+                        className={`w-full px-3 py-1.5 rounded-xl outline-none border text-base sm:text-xs ${isPinkTheme ? 'bg-white border-pink-200 text-[#37131D]' : 'bg-slate-100 dark:bg-slate-800 border-transparent focus:border-slate-300 dark:focus:border-slate-700'}`}
                       />
                     </div>
                   </div>
@@ -809,14 +809,14 @@ export const CatatModal: React.FC = () => {
               )}
 
               {/* Tactile Keypad */}
-              <div className="grid grid-cols-3 gap-1.5 pt-1">
+              <div className="grid grid-cols-3 gap-1 pt-0.5">
                 {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '000'].map(
                   key => {
                     return (
                       <button
                         key={key}
                         onClick={() => handleKeypadPress(key)}
-                        className={`py-2.5 rounded-xl text-base font-bold transition active:scale-95 tabular-nums ${
+                        className={`py-2 rounded-xl text-base font-bold transition active:scale-95 tabular-nums ${
                           key === '000'
                             ? isPinkTheme ? 'bg-pink-100 text-pink-700 font-extrabold border border-pink-300' : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-extrabold border border-emerald-200/50 dark:border-emerald-800/50'
                             : key === 'C'
@@ -831,22 +831,6 @@ export const CatatModal: React.FC = () => {
                 )}
               </div>
 
-              {/* Action Buttons */}
-              <div className={`sticky bottom-0 z-10 flex gap-2 pt-2 pb-1 -mx-4 px-4 ${isPinkTheme ? 'bg-[#FFF5F7]' : 'bg-white dark:bg-[#111827]'}`}>
-                <button
-                  onClick={() => handleSaveManual(true)}
-                  className={`px-3.5 py-3 rounded-2xl text-xs font-bold transition active:scale-95 min-h-[44px] ${isPinkTheme ? 'bg-pink-100 text-pink-800 hover:bg-pink-200' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200'}`}
-                >
-                  + Tambah Lagi
-                </button>
-                <button
-                  onClick={() => handleSaveManual(false)}
-                  className={`flex-1 py-3 rounded-2xl text-xs font-bold shadow-sm transition active:scale-95 flex items-center justify-center gap-1.5 min-h-[44px] ${isPinkTheme ? 'bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 shadow-rose-300/40 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`}
-                >
-                  <Check className="w-4 h-4 stroke-[2.5]" />
-                  <span>Simpan Transaksi</span>
-                </button>
-              </div>
             </div>
           )}
 
@@ -1219,7 +1203,7 @@ export const CatatModal: React.FC = () => {
                         <span className="text-[10px] font-bold text-slate-400 uppercase">
                           Item Struk ({ocrParsedResult.items.length})
                         </span>
-                        <span className="text-[10px] text-emerald-600 font-semibold">Pecah Item (FR-16)</span>
+                        <span className={`text-[10px] font-semibold ${isPinkTheme ? 'text-pink-600' : 'text-emerald-600'}`}>Pecah Item</span>
                       </div>
                       <div className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200/60 dark:border-slate-800 space-y-1">
                         {ocrParsedResult.items.map(item => (
@@ -1365,6 +1349,37 @@ export const CatatModal: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Manual Save Footer (fixed outside scroll area) */}
+        {activeTab === 'manual' && (
+          <div className={`shrink-0 flex gap-2 px-4 pt-3 pb-safe-bottom border-t ${
+            isPinkTheme
+              ? 'bg-[#FFF5F7] border-pink-200/60'
+              : 'bg-white dark:bg-[#111827] border-slate-100 dark:border-slate-800/80'
+          }`}>
+            <button
+              onClick={() => handleSaveManual(true)}
+              className={`px-3.5 py-2.5 rounded-2xl text-xs font-bold transition active:scale-95 min-h-[44px] ${
+                isPinkTheme
+                  ? 'bg-pink-100 text-pink-800 hover:bg-pink-200'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200'
+              }`}
+            >
+              + Tambah Lagi
+            </button>
+            <button
+              onClick={() => handleSaveManual(false)}
+              className={`flex-1 py-2.5 rounded-2xl text-xs font-bold shadow-sm transition active:scale-95 flex items-center justify-center gap-1.5 min-h-[44px] ${
+                isPinkTheme
+                  ? 'bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 shadow-rose-300/40 text-white'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              }`}
+            >
+              <Check className="w-4 h-4 stroke-[2.5]" />
+              <span>Simpan Transaksi</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

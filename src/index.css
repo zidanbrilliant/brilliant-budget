@@ -29,6 +29,7 @@
 
 /* Theme Classes */
 :root {
+  color-scheme: light;
   --app-bg: #fff5f7;
   --app-card: #ffffff;
   --app-border: #fce7f3;
@@ -47,12 +48,60 @@ html.theme-light {
 }
 
 html.dark {
+  color-scheme: dark;
   --app-bg: #090e17;
   --app-card: #151e2e;
   --app-border: #1e293b;
   --app-text: #f8fafc;
   --app-muted: #94a3b8;
   --app-accent: #f43f5e;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--app-bg);
+    color: var(--app-text);
+  }
+
+  button,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--app-accent);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: color-mix(in srgb, var(--app-accent) 24%, transparent);
+  }
+}
+
+input[type='date']::-webkit-calendar-picker-indicator {
+  opacity: 0.55;
+  cursor: pointer;
+}
+
+/* Keep numeric fields clean: hide native steppers, keypad is the primary input */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+html.dark input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 0.65;
 }
 
 /* iOS WebKit: Prevent automatic viewport zoom on input focus */

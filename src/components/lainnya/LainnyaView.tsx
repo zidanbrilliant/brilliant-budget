@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatIDR, formatCompactIDR } from '../../utils/formatters';
 import { AppIcon } from '../common/IconHelper';
@@ -60,6 +60,44 @@ export const LainnyaView: React.FC = () => {
 
   const [activeSection, setActiveSection] = useState<'menu' | 'dompet' | 'laporan' | 'backup' | 'sms_simulator' | 'kategori' | 'googlesheets'>('menu');
   const isPinkTheme = settings.theme === 'pink';
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.querySelector('main')?.scrollTo(0, 0);
+  }, [activeSection]);
+
+  const sectionMeta: Record<string, { title: string; subtitle: string }> = {
+    dompet: { title: 'Dompet & Rekening', subtitle: 'Kelola saldo dan transfer antar dompet' },
+    kategori: { title: 'Kategori Transaksi', subtitle: 'Atur kategori pengeluaran dan pemasukan' },
+    laporan: { title: 'Laporan & Wawasan', subtitle: 'Ringkasan dan analisis keuanganmu' },
+    backup: { title: 'Cadangan & Pemulihan', subtitle: 'Simpan data ke file lokal yang aman' },
+    sms_simulator: { title: 'Uji Parser SMS', subtitle: 'Simulasi otomatisasi dari teks SMS bank' },
+    googlesheets: { title: 'Google Sheets', subtitle: 'Sinkronkan transaksi secara otomatis' },
+  };
+  const activeMeta = activeSection === 'menu' ? null : sectionMeta[activeSection];
+  const primaryBtn = isPinkTheme
+    ? 'bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white shadow-xs shadow-rose-200'
+    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs';
+  const secondaryBtn = isPinkTheme
+    ? 'bg-pink-100 text-pink-700 hover:bg-pink-200'
+    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700';
+  const segmentIdle = isPinkTheme
+    ? 'bg-pink-100/70 text-pink-700 hover:bg-pink-200/70'
+    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300';
+  const softAccent = isPinkTheme
+    ? 'text-pink-600 bg-pink-50 dark:bg-pink-950/40 dark:text-pink-300'
+    : 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/80 dark:text-emerald-400';
+  const fieldClass = `w-full px-3 py-2 rounded-xl border outline-none transition ${
+    isPinkTheme
+      ? 'bg-white border-pink-200 text-[#37131D] placeholder:text-pink-300 focus:border-pink-400'
+      : 'bg-slate-100 dark:bg-slate-800 border-transparent text-slate-900 dark:text-slate-100 focus:border-slate-300 dark:focus:border-slate-700'
+  }`;
+  const modalCard = `rounded-2xl p-5 max-w-sm w-full space-y-3.5 shadow-2xl border animate-scale-up ${
+    isPinkTheme
+      ? 'bg-[#FFF5F7] border-pink-200 text-[#37131D]'
+      : 'bg-white dark:bg-[#151E2E] border-slate-200 dark:border-slate-800'
+  }`;
+  const labelClass = `text-[11px] font-bold uppercase block mb-1 ${isPinkTheme ? 'text-pink-500/80' : 'text-slate-400'}`;
 
   // Google Sheets state
   const [sheetUrl, setSheetUrl] = useState(getSheetWebhookUrl());
@@ -209,24 +247,34 @@ export const LainnyaView: React.FC = () => {
   return (
     <div className="p-4 space-y-4">
       {/* Top Header with Back Navigation if in sub-section */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-3">
         {activeSection === 'menu' ? (
           <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            <h1 className={`text-xl font-bold tracking-tight ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
               Pengaturan
             </h1>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-400 mt-0.5">
               Kelola dompet, kategori, laporan & keamanan
             </p>
           </div>
         ) : (
-          <button
-            onClick={() => setActiveSection('menu')}
-            className="flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
-          >
-            <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
-            <span>Kembali ke Pengaturan</span>
-          </button>
+          <div className="min-w-0">
+            <button
+              onClick={() => setActiveSection('menu')}
+              className={`inline-flex items-center gap-1 text-[11px] font-bold mb-2 transition ${
+                isPinkTheme
+                  ? 'text-pink-600 hover:text-pink-700'
+                  : 'text-emerald-600 dark:text-emerald-400 hover:underline'
+              }`}
+            >
+              <ChevronLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Kembali ke Pengaturan</span>
+            </button>
+            <h1 className={`text-xl font-bold tracking-tight ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
+              {activeMeta?.title}
+            </h1>
+            <p className="text-xs text-slate-400 mt-0.5">{activeMeta?.subtitle}</p>
+          </div>
         )}
       </div>
 
@@ -366,7 +414,7 @@ export const LainnyaView: React.FC = () => {
                     <Shield className="w-4 h-4" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-slate-900 dark:text-white">Cadangan Terenkripsi (.catatbak)</div>
+                    <div className="text-xs font-bold text-slate-900 dark:text-white">Cadangan Lokal (.catatbak)</div>
                     <div className="text-[11px] text-slate-400">Simpan atau pulihkan file cadangan</div>
                   </div>
                 </div>
@@ -397,42 +445,44 @@ export const LainnyaView: React.FC = () => {
               Sistem & Tema
             </span>
             <div className="bg-white dark:bg-[#151E2E] rounded-2xl divide-y divide-slate-100 dark:divide-slate-800/80 border border-slate-200/80 dark:border-slate-800/80 shadow-xs text-xs overflow-hidden">
-              <div className="p-3.5 flex items-center justify-between">
+              <div className="p-3.5 space-y-2.5">
                 <div>
                   <div className="font-semibold text-slate-800 dark:text-slate-200">Tema Warna</div>
                   <div className="text-[11px] text-slate-400">Pilih estetika tampilan favoritmu</div>
                 </div>
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={() => updateSettings({ theme: 'pink' })}
-                    className={`px-2.5 py-1 rounded-xl font-bold text-xs transition active:scale-95 ${
-                      settings.theme === 'pink' ? 'bg-rose-500 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                    }`}
-                  >
-                    🌸 Pink
-                  </button>
-                  <button
-                    onClick={() => updateSettings({ theme: 'light' })}
-                    className={`px-2.5 py-1 rounded-xl font-bold text-xs transition active:scale-95 ${
-                      settings.theme === 'light' ? 'bg-slate-900 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                    }`}
-                  >
-                    ⚪ Light
-                  </button>
-                  <button
-                    onClick={() => updateSettings({ theme: 'dark' })}
-                    className={`px-2.5 py-1 rounded-xl font-bold text-xs transition active:scale-95 ${
-                      settings.theme === 'dark' ? 'bg-slate-800 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
-                    }`}
-                  >
-                    🌙 Dark
-                  </button>
+                <div
+                  role="group"
+                  aria-label="Pilih tema warna"
+                  className={`grid grid-cols-3 gap-1 p-1 rounded-xl ${isPinkTheme ? 'bg-pink-100/70' : 'bg-slate-100 dark:bg-slate-800/80'}`}
+                >
+                  {([
+                    { id: 'pink', label: 'Pink', emoji: '🌸' },
+                    { id: 'light', label: 'Light', emoji: '⚪' },
+                    { id: 'dark', label: 'Dark', emoji: '🌙' },
+                  ] as const).map(t => {
+                    const selected = settings.theme === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => updateSettings({ theme: t.id })}
+                        aria-pressed={selected}
+                        className={`py-1.5 rounded-lg text-xs transition active:scale-95 flex items-center justify-center gap-1 ${
+                          selected
+                            ? `bg-white dark:bg-slate-700 shadow-2xs font-bold ${isPinkTheme ? 'text-rose-600' : 'text-slate-900 dark:text-white'}`
+                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                        }`}
+                      >
+                        <span aria-hidden="true">{t.emoji}</span>
+                        <span>{t.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
               <div className="p-3.5 flex items-center justify-between">
                 <span className="font-medium text-slate-700 dark:text-slate-300">Privasi Server</span>
-                <span className="font-bold text-emerald-600">100% On-Device</span>
+                <span className={`font-bold ${isPinkTheme ? 'text-pink-600' : 'text-emerald-600'}`}>100% On-Device</span>
               </div>
               <div className="p-3.5 flex items-center justify-between">
                 <span className="font-medium text-slate-700 dark:text-slate-300">Mata Uang</span>
@@ -456,7 +506,7 @@ export const LainnyaView: React.FC = () => {
             {/* App Version Info Badge */}
             <div className="text-center pt-2 pb-4 space-y-1">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${isPinkTheme ? 'bg-pink-500' : 'bg-emerald-500'}`}></span>
                 <span>Brilliant Budget v0.2.1</span>
                 <span className="text-slate-300 dark:text-slate-600">·</span>
                 <span>Build 20261012</span>
@@ -472,20 +522,23 @@ export const LainnyaView: React.FC = () => {
       {/* ===================== SUB SECTION: DOMPET ===================== */}
       {activeSection === 'dompet' && (
         <div className="space-y-3.5">
-          <div className="flex items-center justify-between px-1">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Dompet & Rekening (Total: {formatIDR(totalNetWorth)})
-            </h3>
-            <div className="flex gap-1.5">
+          <div className="flex items-end justify-between gap-2 px-1">
+            <div>
+              <span className="text-[11px] text-slate-400 font-semibold">Total saldo</span>
+              <div className={`text-base font-extrabold tabular-nums ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
+                {formatIDR(totalNetWorth)}
+              </div>
+            </div>
+            <div className="flex gap-1.5 shrink-0">
               <button
                 onClick={() => setIsTransferOpen(true)}
-                className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/80 px-2.5 py-1 rounded-lg"
+                className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/80 px-2.5 py-1.5 rounded-lg transition active:scale-95"
               >
                 Transfer
               </button>
               <button
                 onClick={() => setIsAddWalletOpen(true)}
-                className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/80 px-2.5 py-1 rounded-lg"
+                className={`text-xs font-bold px-2.5 py-1.5 rounded-lg transition active:scale-95 ${softAccent}`}
               >
                 + Dompet
               </button>
@@ -526,7 +579,7 @@ export const LainnyaView: React.FC = () => {
                         setAdjustAccId(acc.id);
                         setNewBalanceInput(balance);
                       }}
-                      className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline mt-0.5"
+                      className={`text-[11px] font-semibold hover:underline mt-0.5 ${isPinkTheme ? 'text-pink-600' : 'text-emerald-600 dark:text-emerald-400'}`}
                     >
                       Sesuaikan Saldo
                     </button>
@@ -542,12 +595,12 @@ export const LainnyaView: React.FC = () => {
       {activeSection === 'kategori' && (
         <div className="space-y-3.5">
           <div className="flex items-center justify-between px-1">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Kategori Aktif ({categories.length})
-            </h3>
+            <span className="text-[11px] text-slate-400 font-semibold">
+              {categories.length} kategori aktif
+            </span>
             <button
               onClick={() => setIsAddCatOpen(true)}
-              className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-2.5 py-1 rounded-lg flex items-center gap-1"
+              className={`text-xs font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition active:scale-95 ${softAccent}`}
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Tambah</span>
@@ -616,12 +669,10 @@ export const LainnyaView: React.FC = () => {
       {activeSection === 'laporan' && (
         <div className="space-y-3.5">
           <div className="flex items-center justify-between px-1">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Laporan Keuangan
-            </h3>
+            <span className="text-[11px] text-slate-400 font-semibold">Ringkasan bulan ini</span>
             <button
               onClick={() => setIsPdfModalOpen(true)}
-              className="flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 px-2.5 py-1 rounded-lg"
+              className="flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 px-2.5 py-1.5 rounded-lg transition active:scale-95"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Cetak PDF</span>
@@ -630,9 +681,9 @@ export const LainnyaView: React.FC = () => {
 
           {/* Wawasan Card */}
           <div className="bg-[#0F172A] dark:bg-[#111827] text-white p-4 rounded-2xl border border-slate-800 space-y-2">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+            <div className={`flex items-center gap-1.5 text-xs font-bold ${isPinkTheme ? 'text-pink-300' : 'text-emerald-400'}`}>
               <Sparkles className="w-4 h-4" />
-              <span>Wawasan On-Device (FR-53)</span>
+              <span>Wawasan On-Device</span>
             </div>
             <div className="space-y-1 text-xs text-slate-300 leading-relaxed">
               <div>• Pengeluaran bulan ini: <strong className="tabular-nums">{formatIDR(getMonthSummary().expense)}</strong>.</div>
@@ -684,19 +735,19 @@ export const LainnyaView: React.FC = () => {
       {activeSection === 'backup' && (
         <div className="space-y-3.5">
           <div className="bg-white dark:bg-[#151E2E] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 space-y-3 text-xs">
-            <div className="font-bold text-slate-900 dark:text-white text-sm">Cadangan Terenkripsi (.catatbak)</div>
+            <div className={`font-bold text-sm ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>File Cadangan Lokal (.catatbak)</div>
             <p className="text-slate-400 leading-relaxed">
               Semua data disimpan di file lokal perangkat Anda. Anda dapat mencadangkan atau memulihkannya kapan saja.
             </p>
             <div className="flex gap-2 pt-1">
               <button
                 onClick={handleExportBackup}
-                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-xs"
+                className={`flex-1 py-2.5 rounded-xl font-bold flex items-center justify-center gap-1.5 transition active:scale-95 ${primaryBtn}`}
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Simpan File</span>
               </button>
-              <label className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-center cursor-pointer flex items-center justify-center gap-1.5 hover:bg-slate-200 transition">
+              <label className={`flex-1 py-2.5 rounded-xl font-bold text-center cursor-pointer flex items-center justify-center gap-1.5 transition active:scale-95 ${secondaryBtn}`}>
                 <Upload className="w-3.5 h-3.5" />
                 <span>Pulihkan</span>
                 <input
@@ -714,8 +765,8 @@ export const LainnyaView: React.FC = () => {
       {/* ===================== SUB SECTION: SMS TESTER ===================== */}
       {activeSection === 'sms_simulator' && (
         <div className="space-y-3 bg-white dark:bg-[#151E2E] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 text-xs">
-          <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-            Uji Coba Otomatisasi SMS Bank (FR-22)
+          <h3 className={`font-bold text-sm ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
+            Uji Coba Otomatisasi SMS Bank
           </h3>
           <p className="text-slate-400 leading-relaxed">
             Simulasi cara kerja Shortcuts App Intent `ParseTransactionText(text)` tanpa jaringan.
@@ -724,13 +775,13 @@ export const LainnyaView: React.FC = () => {
             value={smsInput}
             onChange={e => setSmsInput(e.target.value)}
             rows={3}
-            className="w-full p-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl border border-transparent focus:border-slate-300 dark:focus:border-slate-700 outline-none font-mono"
+            className={`${fieldClass} font-mono`}
           />
           <div className="flex gap-2">
             <button
               type="button"
               onClick={handlePasteClipboardSMS}
-              className="py-2.5 px-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold flex items-center justify-center gap-1.5 transition active:scale-95"
+              className={`py-2.5 px-3 rounded-xl font-bold flex items-center justify-center gap-1.5 transition active:scale-95 ${secondaryBtn}`}
             >
               <Clipboard className="w-3.5 h-3.5" />
               <span>Tempel Clipboard</span>
@@ -738,7 +789,7 @@ export const LainnyaView: React.FC = () => {
             <button
               type="button"
               onClick={handleProcessSMS}
-              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-xs transition active:scale-95"
+              className={`flex-1 py-2.5 rounded-xl font-bold flex items-center justify-center gap-1.5 transition active:scale-95 ${primaryBtn}`}
             >
               <Send className="w-3.5 h-3.5" />
               <span>Kirim & Ekstraksi ke Inbox Draft</span>
@@ -750,7 +801,7 @@ export const LainnyaView: React.FC = () => {
       {/* ===================== SUB SECTION: GOOGLE SHEETS ===================== */}
       {activeSection === 'googlesheets' && (
         <div className="space-y-4">
-          <div className="bg-white dark:bg-[#151E2E] p-4.5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-3.5 text-xs">
+          <div className="bg-white dark:bg-[#151E2E] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-3.5 text-xs">
             <div>
               <h3 className="font-bold text-slate-900 dark:text-white text-sm">
                 Hubungkan ke Google Sheets Pribadi
@@ -769,7 +820,7 @@ export const LainnyaView: React.FC = () => {
                 value={sheetUrl}
                 onChange={e => setSheetUrl(e.target.value)}
                 placeholder="https://script.google.com/macros/s/.../exec"
-                className="w-full p-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl border border-transparent focus:border-teal-500 outline-none font-mono text-[11px]"
+                className={`${fieldClass} font-mono text-[11px]`}
               />
             </div>
 
@@ -780,7 +831,7 @@ export const LainnyaView: React.FC = () => {
                   setSheetWebhookUrl(sheetUrl);
                   showToast('URL Google Sheets disimpan');
                 }}
-                className="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold transition active:scale-95 shadow-xs"
+                className={`flex-1 py-2.5 rounded-xl font-bold transition active:scale-95 ${primaryBtn}`}
               >
                 Simpan URL
               </button>
@@ -806,7 +857,7 @@ export const LainnyaView: React.FC = () => {
                     showToast('Gagal kirim, periksa izin deployment Web App');
                   }
                 }}
-                className="px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition active:scale-95 disabled:opacity-50"
+                className={`px-3.5 py-2.5 rounded-xl font-bold transition active:scale-95 disabled:opacity-50 ${secondaryBtn}`}
               >
                 {isTestingSheet ? 'Mengirim...' : 'Tes Kirim'}
               </button>
@@ -818,7 +869,7 @@ export const LainnyaView: React.FC = () => {
                 <span className="font-semibold text-slate-700 dark:text-slate-300">
                   Antrean Tertunda:
                 </span>{' '}
-                <span className="font-bold text-teal-600">{queueCount} transaksi</span>
+                <span className={`font-bold ${isPinkTheme ? 'text-pink-600' : 'text-teal-600'}`}>{queueCount} transaksi</span>
               </div>
               <button
                 type="button"
@@ -832,7 +883,11 @@ export const LainnyaView: React.FC = () => {
                     showToast('Gagal sinkron atau antrean kosong');
                   }
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 font-bold hover:bg-teal-100 transition active:scale-95 disabled:opacity-40"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition active:scale-95 disabled:opacity-40 ${
+                  isPinkTheme
+                    ? 'bg-pink-50 dark:bg-pink-950/60 text-pink-700 dark:text-pink-300 hover:bg-pink-100'
+                    : 'bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 hover:bg-teal-100'
+                }`}
               >
                 <RefreshCw className="w-3 h-3" />
                 <span>Kirim Antrean</span>
@@ -841,7 +896,7 @@ export const LainnyaView: React.FC = () => {
           </div>
 
           {/* Setup Guide Card */}
-          <div className="bg-white dark:bg-[#151E2E] p-4.5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-3 text-xs">
+          <div className="bg-white dark:bg-[#151E2E] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-3 text-xs">
             <div className="flex items-center justify-between">
               <h4 className="font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">
                 Panduan Setup 1 Menit
@@ -854,7 +909,7 @@ export const LainnyaView: React.FC = () => {
                   showToast('Kode skrip disalin ke clipboard');
                   setTimeout(() => setIsCopiedCode(false), 2000);
                 }}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold text-[11px] transition active:scale-95"
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-[11px] transition active:scale-95 ${secondaryBtn}`}
               >
                 {isCopiedCode ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
                 <span>{isCopiedCode ? 'Tersalin' : 'Salin Kode Skrip'}</span>
@@ -876,8 +931,8 @@ export const LainnyaView: React.FC = () => {
       {/* Modal Penyesuaian Saldo (FR-30) */}
       {adjustAccId && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#151E2E] rounded-2xl p-5 max-w-sm w-full space-y-3.5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+          <div className={modalCard}>
+            <h3 className={`font-bold text-sm ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
               Sesuaikan Saldo Nyata
             </h3>
             <p className="text-xs text-slate-400">
@@ -889,12 +944,12 @@ export const LainnyaView: React.FC = () => {
               value={newBalanceInput || ''}
               placeholder="0"
               onChange={e => setNewBalanceInput(Math.max(0, Number(e.target.value)))}
-              className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm font-bold outline-none tabular-nums"
+              className={`${fieldClass} text-sm font-bold tabular-nums`}
             />
             <div className="flex gap-2">
               <button
                 onClick={() => setAdjustAccId(null)}
-                className="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300"
+                className={`flex-1 py-2 rounded-xl text-xs font-bold ${secondaryBtn}`}
               >
                 Batal
               </button>
@@ -903,7 +958,7 @@ export const LainnyaView: React.FC = () => {
                   adjustAccountBalance(adjustAccId, newBalanceInput);
                   setAdjustAccId(null);
                 }}
-                className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500"
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition active:scale-[0.98] ${primaryBtn}`}
               >
                 Simpan
               </button>
@@ -915,27 +970,27 @@ export const LainnyaView: React.FC = () => {
       {/* Modal Tambah Dompet Baru */}
       {isAddWalletOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#151E2E] rounded-2xl p-5 max-w-sm w-full space-y-3.5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+          <div className={modalCard}>
+            <h3 className={`font-bold text-sm ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
               Tambah Dompet Baru
             </h3>
             <div className="space-y-2.5 text-xs">
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nama Dompet</label>
+                <label className={labelClass}>Nama Dompet</label>
                 <input
                   type="text"
                   value={newWalletName}
                   onChange={e => setNewWalletName(e.target.value)}
                   placeholder="Mis. Mandiri Tabungan"
-                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none"
+                  className={fieldClass}
                 />
               </div>
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Jenis</label>
+                <label className={labelClass}>Jenis</label>
                 <select
                   value={newWalletType}
                   onChange={e => setNewWalletType(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-semibold"
+                  className={`${fieldClass} font-semibold`}
                 >
                   <option value="bank">Rekening Bank</option>
                   <option value="ewallet">E-Wallet</option>
@@ -943,21 +998,21 @@ export const LainnyaView: React.FC = () => {
                 </select>
               </div>
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Saldo Awal (Rp)</label>
+                <label className={labelClass}>Saldo Awal (Rp)</label>
                 <input
                   type="number"
                   inputMode="numeric"
                   value={newWalletBalance || ''}
                   placeholder="0"
                   onChange={e => setNewWalletBalance(Math.max(0, Number(e.target.value)))}
-                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-bold tabular-nums"
+                  className={`${fieldClass} font-bold tabular-nums`}
                 />
               </div>
             </div>
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => setIsAddWalletOpen(false)}
-                className="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300"
+                className={`flex-1 py-2 rounded-xl text-xs font-bold ${secondaryBtn}`}
               >
                 Batal
               </button>
@@ -977,7 +1032,7 @@ export const LainnyaView: React.FC = () => {
                   setNewWalletBalance(0);
                   setIsAddWalletOpen(false);
                 }}
-                className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500"
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition active:scale-[0.98] ${primaryBtn}`}
               >
                 Tambah
               </button>
@@ -989,17 +1044,17 @@ export const LainnyaView: React.FC = () => {
       {/* Modal Transfer Antar Dompet */}
       {isTransferOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#151E2E] rounded-2xl p-5 max-w-sm w-full space-y-3.5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+          <div className={modalCard}>
+            <h3 className={`font-bold text-sm ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
               Transfer Antar Dompet
             </h3>
             <div className="space-y-2.5 text-xs">
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Dari Dompet Asal</label>
+                <label className={labelClass}>Dari Dompet Asal</label>
                 <select
                   value={fromAcc}
                   onChange={e => setFromAcc(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl font-semibold"
+                  className={`${fieldClass} font-semibold`}
                 >
                   {accounts.map(a => (
                     <option key={a.id} value={a.id}>
@@ -1010,11 +1065,11 @@ export const LainnyaView: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Ke Dompet Tujuan</label>
+                <label className={labelClass}>Ke Dompet Tujuan</label>
                 <select
                   value={toAcc}
                   onChange={e => setToAcc(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl font-semibold"
+                  className={`${fieldClass} font-semibold`}
                 >
                   {accounts
                     .filter(a => a.id !== fromAcc)
@@ -1027,26 +1082,26 @@ export const LainnyaView: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nominal (Rp)</label>
+                <label className={labelClass}>Nominal (Rp)</label>
                 <input
                   type="number"
                   inputMode="numeric"
                   value={transferAmount || ''}
                   placeholder="0"
                   onChange={e => setTransferAmount(Math.max(0, Number(e.target.value)))}
-                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold tabular-nums"
+                  className={`${fieldClass} font-bold tabular-nums`}
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Biaya Admin (Opsional)</label>
+                <label className={labelClass}>Biaya Admin (Opsional)</label>
                 <input
                   type="number"
                   inputMode="numeric"
                   value={transferFee || ''}
                   onChange={e => setTransferFee(Math.max(0, Number(e.target.value)))}
                   placeholder="0"
-                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl tabular-nums"
+                  className={`${fieldClass} tabular-nums`}
                 />
               </div>
             </div>
@@ -1054,7 +1109,7 @@ export const LainnyaView: React.FC = () => {
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => setIsTransferOpen(false)}
-                className="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold"
+                className={`flex-1 py-2 rounded-xl text-xs font-bold ${secondaryBtn}`}
               >
                 Batal
               </button>
@@ -1072,32 +1127,33 @@ export const LainnyaView: React.FC = () => {
       {/* Modal Tambah Kategori */}
       {isAddCatOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#151E2E] rounded-2xl p-5 max-w-sm w-full space-y-3.5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+          <div className={modalCard}>
+            <h3 className={`font-bold text-sm ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
               Tambah Kategori Baru
             </h3>
             <div className="space-y-2.5 text-xs">
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nama Kategori</label>
+                <label className={labelClass}>Nama Kategori</label>
                 <input
                   type="text"
                   value={newCatName}
                   onChange={e => setNewCatName(e.target.value)}
                   placeholder="Mis. Skincare, Zakat"
-                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none"
+                  className={fieldClass}
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Jenis Kategori</label>
+                <label className={labelClass}>Jenis Kategori</label>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setNewCatKind('expense')}
+                    aria-pressed={newCatKind === 'expense'}
                     className={`flex-1 py-2 rounded-xl font-bold transition ${
                       newCatKind === 'expense'
                         ? 'bg-rose-500 text-white'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                        : segmentIdle
                     }`}
                   >
                     Pengeluaran
@@ -1105,10 +1161,11 @@ export const LainnyaView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setNewCatKind('income')}
+                    aria-pressed={newCatKind === 'income'}
                     className={`flex-1 py-2 rounded-xl font-bold transition ${
                       newCatKind === 'income'
                         ? 'bg-emerald-600 text-white'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                        : segmentIdle
                     }`}
                   >
                     Pemasukan
@@ -1117,15 +1174,19 @@ export const LainnyaView: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Pilih Warna</label>
+                <label className={labelClass}>Pilih Warna</label>
                 <div className="flex gap-2">
                   {['#FB7185', '#F472B6', '#FDA4AF', '#FB923C', '#C084FC', '#10B981'].map(color => (
                     <button
                       key={color}
                       type="button"
                       onClick={() => setNewCatColor(color)}
+                      aria-label={`Pilih warna ${color}`}
+                      aria-pressed={newCatColor === color}
                       className={`w-7 h-7 rounded-full transition-transform ${
-                        newCatColor === color ? 'scale-125 ring-2 ring-slate-400' : ''
+                        newCatColor === color
+                          ? `scale-125 ring-2 ${isPinkTheme ? 'ring-pink-400' : 'ring-slate-400'}`
+                          : ''
                       }`}
                       style={{ backgroundColor: color }}
                     />
@@ -1137,7 +1198,7 @@ export const LainnyaView: React.FC = () => {
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => setIsAddCatOpen(false)}
-                className="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold"
+                className={`flex-1 py-2 rounded-xl text-xs font-bold ${secondaryBtn}`}
               >
                 Batal
               </button>
@@ -1153,7 +1214,7 @@ export const LainnyaView: React.FC = () => {
                   setNewCatName('');
                   setIsAddCatOpen(false);
                 }}
-                className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold"
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition active:scale-[0.98] ${primaryBtn}`}
               >
                 Simpan
               </button>
@@ -1165,37 +1226,42 @@ export const LainnyaView: React.FC = () => {
       {/* Modal Edit Kategori */}
       {editingCat && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#151E2E] rounded-2xl p-5 max-w-sm w-full space-y-3.5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
+          <div className={modalCard}>
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+              <h3 className={`font-bold text-sm ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
                 Ubah Kategori
               </h3>
-              <button onClick={() => setEditingCat(null)} className="text-slate-400 hover:text-slate-600">
+              <button
+                onClick={() => setEditingCat(null)}
+                aria-label="Tutup"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="space-y-2.5 text-xs">
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nama Kategori</label>
+                <label className={labelClass}>Nama Kategori</label>
                 <input
                   type="text"
                   value={editCatName}
                   onChange={e => setEditCatName(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none"
+                  className={fieldClass}
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Jenis Kategori</label>
+                <label className={labelClass}>Jenis Kategori</label>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setEditCatKind('expense')}
+                    aria-pressed={editCatKind === 'expense'}
                     className={`flex-1 py-2 rounded-xl font-bold transition ${
                       editCatKind === 'expense'
                         ? 'bg-rose-500 text-white'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                        : segmentIdle
                     }`}
                   >
                     Pengeluaran
@@ -1203,10 +1269,11 @@ export const LainnyaView: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setEditCatKind('income')}
+                    aria-pressed={editCatKind === 'income'}
                     className={`flex-1 py-2 rounded-xl font-bold transition ${
                       editCatKind === 'income'
                         ? 'bg-emerald-600 text-white'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                        : segmentIdle
                     }`}
                   >
                     Pemasukan
@@ -1215,15 +1282,19 @@ export const LainnyaView: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Pilih Warna</label>
+                <label className={labelClass}>Pilih Warna</label>
                 <div className="flex gap-2">
                   {['#FB7185', '#F472B6', '#FDA4AF', '#FB923C', '#C084FC', '#10B981'].map(color => (
                     <button
                       key={color}
                       type="button"
                       onClick={() => setEditCatColor(color)}
+                      aria-label={`Pilih warna ${color}`}
+                      aria-pressed={editCatColor === color}
                       className={`w-7 h-7 rounded-full transition-transform ${
-                        editCatColor === color ? 'scale-125 ring-2 ring-slate-400' : ''
+                        editCatColor === color
+                          ? `scale-125 ring-2 ${isPinkTheme ? 'ring-pink-400' : 'ring-slate-400'}`
+                          : ''
                       }`}
                       style={{ backgroundColor: color }}
                     />
@@ -1235,7 +1306,7 @@ export const LainnyaView: React.FC = () => {
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => setEditingCat(null)}
-                className="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold"
+                className={`flex-1 py-2 rounded-xl text-xs font-bold ${secondaryBtn}`}
               >
                 Batal
               </button>
@@ -1249,7 +1320,7 @@ export const LainnyaView: React.FC = () => {
                   });
                   setEditingCat(null);
                 }}
-                className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold"
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition active:scale-[0.98] ${primaryBtn}`}
               >
                 Simpan Perubahan
               </button>
@@ -1261,24 +1332,33 @@ export const LainnyaView: React.FC = () => {
       {/* Modal Cetak PDF */}
       {isPdfModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#151E2E] rounded-2xl p-5 max-w-md w-full space-y-3.5 shadow-2xl max-h-[85vh] overflow-y-auto animate-scale-up border border-slate-200 dark:border-slate-800">
+          <div className={`rounded-2xl p-5 max-w-md w-full space-y-3.5 shadow-2xl max-h-[85vh] overflow-y-auto animate-scale-up border ${
+            isPinkTheme
+              ? 'bg-[#FFF5F7] border-pink-200 text-[#37131D]'
+              : 'bg-white dark:bg-[#151E2E] border-slate-200 dark:border-slate-800'
+          }`}>
             <div className="flex items-center justify-between border-b pb-2.5 border-slate-200 dark:border-slate-800">
               <div>
-                <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                <h3 className={`font-bold text-sm ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
                   Ringkasan Laporan Keuangan
                 </h3>
-                <span className="text-[11px] text-slate-400">Format Cetak / PDF Siap Cetak (FR-52)</span>
+                <span className="text-[11px] text-slate-400">Format ringkas siap cetak atau simpan PDF</span>
               </div>
               <button
                 onClick={() => setIsPdfModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
+                aria-label="Tutup"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs text-slate-700 dark:text-slate-300">
-              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl space-y-1.5 border border-slate-200/60 dark:border-slate-800">
+            <div className={`space-y-3 text-xs ${isPinkTheme ? 'text-[#4C1D2E]' : 'text-slate-700 dark:text-slate-300'}`}>
+              <div className={`p-3 rounded-xl space-y-1.5 border ${
+                isPinkTheme
+                  ? 'bg-white border-pink-200/70'
+                  : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200/60 dark:border-slate-800'
+              }`}>
                 <div className="flex justify-between">
                   <span>Total Pemasukan:</span>
                   <span className="font-bold text-emerald-600 tabular-nums">{formatIDR(getMonthSummary().income)}</span>
@@ -1314,7 +1394,7 @@ export const LainnyaView: React.FC = () => {
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => setIsPdfModalOpen(false)}
-                className="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold"
+                className={`flex-1 py-2 rounded-xl text-xs font-bold ${secondaryBtn}`}
               >
                 Tutup
               </button>
