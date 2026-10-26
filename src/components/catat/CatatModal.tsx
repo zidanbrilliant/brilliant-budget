@@ -26,7 +26,9 @@ import {
   Clipboard,
   Loader2,
   Square,
+  Zap,
 } from 'lucide-react';
+import { getEngineMode, setEngineMode, type ProcessingEngineMode } from '../../utils/aiMode';
 import { TxnType } from '../../types/index.ts';
 import { pickPhoto, downscaleImage, savePendingUpload } from '../../utils/cameraHelper';
 import { scanQRCodeFromDataUrl } from '../../utils/qrScanner';
@@ -116,6 +118,8 @@ export const CatatModal: React.FC = () => {
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [ocrEngine, setOcrEngine] = useState<'gemini' | 'tesseract' | 'local' | null>(null);
+  const [ocrProgressText, setOcrProgressText] = useState<string>('');
+  const [engineMode, setEngineModeState] = useState<ProcessingEngineMode>(() => getEngineMode());
 
   // Gemini AI State
   const [aiStatus, setAiStatus] = useState<AIStatus | null>(null);
@@ -123,8 +127,18 @@ export const CatatModal: React.FC = () => {
   const [voiceEngine, setVoiceEngine] = useState<'gemini' | 'local' | 'speech' | null>(null);
   const [voiceRecordingSeconds, setVoiceRecordingSeconds] = useState(0);
   const voiceRecorderRef = useRef<VoiceRecorder | null>(null);
+  const speechRecognitionRef = useRef<any>(null);
   const recordingTimerRef = useRef<number | null>(null);
   const hasAI = Boolean(getStoredGeminiKey()) || Boolean(aiStatus?.available);
+
+  // Sync with engine mode changes from settings
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail) setEngineModeState(e.detail);
+    };
+    window.addEventListener('bb_engine_mode_changed', handler);
+    return () => window.removeEventListener('bb_engine_mode_changed', handler);
+  }, []);
 
   // QRIS State
   const [qrisCustomInput, setQrisCustomInput] = useState('');
@@ -155,6 +169,8 @@ export const CatatModal: React.FC = () => {
       window.clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
     }
+    try { speechRecognitionRef.current?.stop(); } catch {}
+    speechRecognitionRef.current = null;
     voiceRecorderRef.current?.cancel();
     voiceRecorderRef.current = null;
     setIsRecording(false);
@@ -167,6 +183,8 @@ export const CatatModal: React.FC = () => {
         window.clearInterval(recordingTimerRef.current);
         recordingTimerRef.current = null;
       }
+      try { speechRecognitionRef.current?.stop(); } catch {}
+      speechRecognitionRef.current = null;
       voiceRecorderRef.current?.cancel();
       voiceRecorderRef.current = null;
     };
@@ -397,15 +415,101 @@ export const CatatModal: React.FC = () => {
   const handleStartVoice = async () => {
     if (isVoiceProcessing) return;
     if (isRecording) {
-      await stopVoiceAndProcess();
+      if (speechRecognitionRef.current) {
+        try { speechRecognitionRef.current.stop(); } catch {}
+        speechRecognitionRef.current = null;
+        clearRecordingTimer();
+        setIsRecording(false);
+        return;
+      }
+      if (voiceRecorderRef.current) {
+        await stopVoiceAndProcess();
+        return;
+      }
+      setIsRecording(false);
       return;
     }
     if (voiceRecorderRef.current) return;
 
     setVoiceError(null);
 
-    // Jalur utama: rekam audio lalu kirim ke Gemini untuk transkripsi + struktur.
-    if (hasAI && isVoiceRecordingSupported()) {
+    // MODE 1: LOKAL ON-DEVICE (Default / Primary - Web Speech API id-ID)
+    if (engineMode === 'local') {
+      const SpeechRecognition =
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+      if (SpeechRecognition) {
+        try {
+          const recognition = new SpeechRecognition();
+          recognition.lang = 'id-ID';
+          recognition.interimResults = true;
+          recognition.continuous = false;
+          speechRecognitionRef.current = recognition;
+
+          setIsRecording(true);
+          setVoiceEngine('speech');
+          startRecordingTimer();
+          showToast('Mendengarkan (Bahasa Indonesia)...');
+
+          recognition.onresult = (event: any) => {
+            let interim = '';
+            let final = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+              const res = event.results[i];
+              if (res.isFinal) {
+                final += res[0].transcript;
+              } else {
+                interim += res[0].transcript;
+              }
+            }
+            const current = (final || interim).trim();
+            if (current) {
+              setCustomVoiceInput(current);
+            }
+            if (final) {
+              clearRecordingTimer();
+              setIsRecording(false);
+              speechRecognitionRef.current = null;
+              const parsed = triggerVoiceParse(final);
+              if (parsed.length > 0) {
+                showToast(`${parsed.length} transaksi terbaca (Lokal on-device)`);
+              }
+            }
+          };
+
+          recognition.onerror = (e: any) => {
+            clearRecordingTimer();
+            setIsRecording(false);
+            speechRecognitionRef.current = null;
+            if (e.error !== 'no-speech') {
+              const el = document.getElementById('custom-voice-input');
+              el?.focus();
+              showToast('Ketuk ikon mic 🎤 pada keyboard untuk dikte suara');
+            }
+          };
+
+          recognition.onend = () => {
+            clearRecordingTimer();
+            setIsRecording(false);
+            speechRecognitionRef.current = null;
+          };
+
+          recognition.start();
+          return;
+        } catch (err) {
+          console.warn('SpeechRecognition start failed:', err);
+        }
+      }
+
+      // Fallback for browsers without SpeechRecognition
+      const el = document.getElementById('custom-voice-input');
+      el?.focus();
+      showToast('Gunakan ikon mic 🎤 pada keyboard untuk dikte suara');
+      return;
+    }
+
+    // MODE 2: CLOUD GEMINI (Optional if user explicitly picked 'cloud')
+    if (engineMode === 'cloud' && hasAI && isVoiceRecordingSupported()) {
       const recorder = new VoiceRecorder();
       voiceRecorderRef.current = recorder;
       try {
@@ -413,7 +517,7 @@ export const CatatModal: React.FC = () => {
         setIsRecording(true);
         setVoiceEngine(null);
         startRecordingTimer();
-        showToast('Mendengarkan... ketuk lagi untuk berhenti');
+        showToast('Merekam suara untuk Gemini AI...');
       } catch (error) {
         voiceRecorderRef.current = null;
         const message =
@@ -426,49 +530,9 @@ export const CatatModal: React.FC = () => {
       return;
     }
 
-    // Fallback: Web Speech API bila Gemini belum aktif atau MediaRecorder tidak tersedia.
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (SpeechRecognition) {
-      try {
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'id-ID';
-        recognition.interimResults = false;
-        setIsRecording(true);
-        setVoiceEngine('speech');
-
-        recognition.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          setIsRecording(false);
-          setCustomVoiceInput(transcript);
-          const parsed = triggerVoiceParse(transcript);
-          showToast(`${parsed.length} transaksi terbaca dari suara`);
-        };
-
-        recognition.onerror = () => {
-          setIsRecording(false);
-          setVoiceEngine(null);
-          const el = document.getElementById('custom-voice-input');
-          el?.focus();
-          showToast('Gunakan ikon mic 🎤 di keyboard iPhone untuk dikte suara');
-        };
-
-        recognition.onend = () => {
-          setIsRecording(false);
-        };
-
-        recognition.start();
-        return;
-      } catch {
-        // Fallback below
-      }
-    }
-
-    // iOS WKWebView fallback: Focus input so iPhone keyboard opens with native dictation mic button
     const el = document.getElementById('custom-voice-input');
     el?.focus();
-    showToast('Ketuk ikon mic 🎤 pada keyboard iPhone untuk dikte suara');
+    showToast('Gunakan ikon mic 🎤 di keyboard iPhone untuk dikte suara');
   };
 
   const handlePasteClipboardVoice = async () => {
@@ -542,7 +606,9 @@ export const CatatModal: React.FC = () => {
     let engine: 'tesseract' | 'local' = 'local';
 
     try {
-      const recognized = await recognizeReceiptText(compressed);
+      const recognized = await recognizeReceiptText(compressed, (progress, status) => {
+        setOcrProgressText(`${status} (${progress}%)`);
+      });
       if (recognized && recognized.trim().length > 5) {
         sample = recognized;
         engine = 'tesseract';
@@ -596,7 +662,7 @@ export const CatatModal: React.FC = () => {
     setIsOcrProcessing(true);
 
     try {
-      if (hasAI) {
+      if (engineMode === 'cloud' && hasAI) {
         try {
           const ai = await scanReceiptWithAI(compressed, aiContext);
           const rawText = ai.result.raw_source_text || '';
@@ -613,6 +679,7 @@ export const CatatModal: React.FC = () => {
         }
       }
 
+      setOcrProgressText('Membaca nota on-device...');
       const local = await runLocalReceiptScan(compressed, filename);
       showToast(
         local.engine === 'tesseract'
@@ -621,6 +688,7 @@ export const CatatModal: React.FC = () => {
       );
     } finally {
       setIsOcrProcessing(false);
+      setOcrProgressText('');
     }
   };
 
@@ -1126,16 +1194,42 @@ export const CatatModal: React.FC = () => {
               </p>
 
               <div className="flex items-center justify-center">
-                <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                    hasAI
-                      ? 'bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-950/60 dark:text-fuchsia-300'
-                      : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-                  }`}
-                >
-                  <Sparkles className="w-3 h-3" />
-                  {hasAI ? 'Gemini AI aktif' : 'Parser lokal on-device'}
-                </span>
+                <div className="inline-flex items-center p-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEngineMode('local');
+                      setEngineModeState('local');
+                      showToast('Mode Lokal On-Device aktif (Instan & Bebas Kuota)');
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold transition ${
+                      engineMode === 'local'
+                        ? isPinkTheme
+                          ? 'bg-rose-500 text-white shadow-xs'
+                          : 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <Zap className="w-3 h-3 fill-current" />
+                    <span>Lokal (Instan)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEngineMode('cloud');
+                      setEngineModeState('cloud');
+                      showToast('Mode Cloud Gemini aktif');
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold transition ${
+                      engineMode === 'cloud'
+                        ? 'bg-fuchsia-600 text-white shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>Cloud Gemini</span>
+                  </button>
+                </div>
               </div>
 
               {/* Mic Button */}
@@ -1175,9 +1269,11 @@ export const CatatModal: React.FC = () => {
                     ? 'Mengubah suara menjadi transaksi terstruktur'
                     : isRecording
                       ? `Ketuk lagi untuk berhenti (maks. ${MAX_RECORDING_SECONDS} detik)`
-                      : hasAI
-                        ? 'Rekaman diproses Gemini AI, tidak disimpan di server'
-                        : 'Tanpa internet · gunakan mic keyboard untuk dikte'}
+                      : engineMode === 'local'
+                        ? 'Pengenalan suara on-device · 0 latensi · bebas kuota'
+                        : hasAI
+                          ? 'Rekaman diproses Gemini AI, tidak disimpan di server'
+                          : 'Tanpa internet · gunakan mic keyboard untuk dikte'}
                 </div>
               </div>
 
@@ -1407,16 +1503,42 @@ export const CatatModal: React.FC = () => {
               </p>
 
               <div className="flex items-center justify-center">
-                <span
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                    hasAI
-                      ? 'bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-950/60 dark:text-fuchsia-300'
-                      : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-                  }`}
-                >
-                  <Sparkles className="w-3 h-3" />
-                  {hasAI ? 'Gemini Vision aktif' : 'OCR lokal on-device'}
-                </span>
+                <div className="inline-flex items-center p-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEngineMode('local');
+                      setEngineModeState('local');
+                      showToast('Mode OCR On-Device aktif (Instan & Bebas Kuota)');
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold transition ${
+                      engineMode === 'local'
+                        ? isPinkTheme
+                          ? 'bg-rose-500 text-white shadow-xs'
+                          : 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <Zap className="w-3 h-3 fill-current" />
+                    <span>OCR On-Device (Instan)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEngineMode('cloud');
+                      setEngineModeState('cloud');
+                      showToast('Mode Cloud Gemini aktif');
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold transition ${
+                      engineMode === 'cloud'
+                        ? 'bg-fuchsia-600 text-white shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>Cloud Gemini</span>
+                  </button>
+                </div>
               </div>
 
               {/* Sample Document Selectors */}
@@ -1530,7 +1652,7 @@ export const CatatModal: React.FC = () => {
                   <Loader2 className="w-5 h-5 animate-spin text-fuchsia-500 shrink-0" />
                   <div>
                     <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                      {hasAI ? 'Membaca nota dengan Gemini AI...' : 'Membaca nota dengan OCR on-device...'}
+                      {ocrProgressText || (engineMode === 'cloud' && hasAI ? 'Membaca nota dengan Gemini AI...' : 'Membaca nota dengan OCR on-device...')}
                     </p>
                     <p className="text-[10px] text-slate-500 dark:text-slate-400">
                       Biasanya 3–8 detik. Hasil tetap bisa diedit sebelum disimpan.

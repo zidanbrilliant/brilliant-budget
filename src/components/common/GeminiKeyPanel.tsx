@@ -14,7 +14,13 @@ import {
   Wifi,
   WifiOff,
   AlertCircle,
+  Zap,
 } from 'lucide-react';
+import {
+  getEngineMode,
+  setEngineMode,
+  type ProcessingEngineMode,
+} from '../../utils/aiMode';
 import {
   clearStoredGeminiKey,
   getAIStatus,
@@ -38,6 +44,7 @@ export const GeminiKeyPanel: React.FC = () => {
   const { settings, showToast } = useApp();
   const isPinkTheme = settings.theme === 'pink';
 
+  const [engineMode, setEngineModeState] = useState<ProcessingEngineMode>(() => getEngineMode());
   const [savedKey, setSavedKey] = useState(() => getStoredGeminiKey());
   const [inputKey, setInputKey] = useState('');
   const [showKey, setShowKey] = useState(false);
@@ -45,6 +52,14 @@ export const GeminiKeyPanel: React.FC = () => {
   const [isLoadingStatus, setIsLoadingStatus] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
   const [message, setMessage] = useState<PanelMessage | null>(null);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (e.detail) setEngineModeState(e.detail);
+    };
+    window.addEventListener('bb_engine_mode_changed', handler);
+    return () => window.removeEventListener('bb_engine_mode_changed', handler);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -170,6 +185,76 @@ export const GeminiKeyPanel: React.FC = () => {
 
   return (
     <div className="space-y-3.5">
+      {/* Pilihan Engine Utama */}
+      <div className={`rounded-2xl p-4 border shadow-xs space-y-3 ${cardClass}`}>
+        <div>
+          <h3 className="font-bold text-sm">Mode Ekstraksi Utama</h3>
+          <p className={`text-[11px] mt-0.5 ${mutedText}`}>
+            Tentukan engine untuk memproses input suara & scan nota
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setEngineMode('local');
+              setEngineModeState('local');
+              showToast('Mode Lokal On-Device aktif (Instan & Bebas Kuota)');
+            }}
+            className={`p-3 rounded-xl border text-left transition flex flex-col justify-between ${
+              engineMode === 'local'
+                ? isPinkTheme
+                  ? 'border-rose-400 bg-rose-50/60 text-rose-950'
+                  : 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-100'
+                : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-600 dark:text-slate-400 opacity-70 hover:opacity-100'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="flex items-center gap-1.5 font-bold text-xs">
+                <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                Lokal On-Device
+              </span>
+              {engineMode === 'local' && (
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              )}
+            </div>
+            <p className="text-[10px] leading-tight text-slate-500 dark:text-slate-400">
+              Instan &lt;100ms, 100% on-device, tanpa kuota, tanpa batas timeout.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEngineMode('cloud');
+              setEngineModeState('cloud');
+              showToast('Mode Cloud Gemini aktif');
+            }}
+            className={`p-3 rounded-xl border text-left transition flex flex-col justify-between ${
+              engineMode === 'cloud'
+                ? isPinkTheme
+                  ? 'border-rose-400 bg-rose-50/60 text-rose-950'
+                  : 'border-fuchsia-500 bg-fuchsia-50/60 dark:bg-fuchsia-950/40 text-fuchsia-950 dark:text-fuchsia-100'
+                : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-600 dark:text-slate-400 opacity-70 hover:opacity-100'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="flex items-center gap-1.5 font-bold text-xs">
+                <Sparkles className="w-3.5 h-3.5 text-fuchsia-500" />
+                Cloud Gemini
+              </span>
+              {engineMode === 'cloud' && (
+                <span className="w-2 h-2 rounded-full bg-fuchsia-500"></span>
+              )}
+            </div>
+            <p className="text-[10px] leading-tight text-slate-500 dark:text-slate-400">
+              Membutuhkan koneksi serverless / BYOK Gemini.
+            </p>
+          </button>
+        </div>
+      </div>
+
       <div className={`rounded-2xl p-4 border shadow-xs space-y-3.5 ${cardClass}`}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
