@@ -20,7 +20,6 @@ import {
 } from '../utils/mockData';
 import { api } from '../services/api';
 import {
-  calculateTotalLimitFromLines,
   cascadeDeleteCategory,
   SYSTEM_CATEGORY_ID,
 } from '../utils/budgetLogic.ts';
@@ -45,14 +44,13 @@ interface AppContextType {
   activeTab: 'beranda' | 'transaksi' | 'catat' | 'budget' | 'lainnya';
   setActiveTab: (tab: 'beranda' | 'transaksi' | 'catat' | 'budget' | 'lainnya') => void;
   isCatatOpen: boolean;
-  openCatat: (mode?: 'manual' | 'voice' | 'ocr' | 'screenshot' | 'qr') => void;
+  openCatat: (mode?: 'manual' | 'voice' | 'ocr' | 'screenshot' | 'qr', initialType?: TxnType) => void;
   closeCatat: () => void;
   catatInitialMode: 'manual' | 'voice' | 'ocr' | 'screenshot' | 'qr';
+  catatInitialType: TxnType;
   toast: ToastAction | null;
   showToast: (message: string, undo?: () => void) => void;
   clearToast: () => void;
-  isLocked: boolean;
-  setIsLocked: (locked: boolean) => void;
   isBackendConnected: boolean;
 
   // Calculators
@@ -164,8 +162,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activeTab, setActiveTab] = useState<'beranda' | 'transaksi' | 'catat' | 'budget' | 'lainnya'>('beranda');
   const [isCatatOpen, setIsCatatOpen] = useState(false);
   const [catatInitialMode, setCatatInitialMode] = useState<'manual' | 'voice' | 'ocr' | 'screenshot' | 'qr'>('manual');
+  const [catatInitialType, setCatatInitialType] = useState<TxnType>('expense');
   const [toast, setToast] = useState<ToastAction | null>(null);
-  const [isLocked, setIsLocked] = useState(false);
   const [isBackendConnected, setIsBackendConnected] = useState(false);
 
   // Sync to Backend if available (with offline fallback)
@@ -264,8 +262,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const clearToast = () => setToast(null);
 
-  const openCatat = (mode: 'manual' | 'voice' | 'ocr' | 'screenshot' | 'qr' = 'manual') => {
+  const openCatat = (
+    mode: 'manual' | 'voice' | 'ocr' | 'screenshot' | 'qr' = 'manual',
+    initialType: TxnType = 'expense'
+  ) => {
     setCatatInitialMode(mode);
+    setCatatInitialType(initialType);
     setIsCatatOpen(true);
   };
 
@@ -533,10 +535,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTransactions(result.updatedTransactions);
 
     const nextLines = result.updatedBudgetLines;
-    const nextTotal =
-      budget.method === 'category' || budget.method === 'envelope'
-        ? calculateTotalLimitFromLines(nextLines)
-        : budget.total_limit;
+    const nextTotal = budget.total_limit;
 
     const nextBudget: BudgetPlan = {
       ...budget,
@@ -582,10 +581,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
-    const nextTotal =
-      budget.method === 'category' || budget.method === 'envelope'
-        ? calculateTotalLimitFromLines(updatedLines)
-        : budget.total_limit;
+    const nextTotal = budget.total_limit;
 
     const nextBudget: BudgetPlan = {
       ...budget,
@@ -628,16 +624,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Budget actions
   const updateBudget = (newBudget: BudgetPlan) => {
-    const adjustedBudget: BudgetPlan = {
-      ...newBudget,
-      total_limit:
-        newBudget.method === 'category' || newBudget.method === 'envelope'
-          ? calculateTotalLimitFromLines(newBudget.lines)
-          : newBudget.total_limit,
-    };
-    setBudget(adjustedBudget);
+    setBudget(newBudget);
     if (isBackendConnected) {
-      api.saveBudget(adjustedBudget).catch(console.error);
+      api.saveBudget(newBudget).catch(console.error);
     }
     showToast('Pengaturan budget diperbarui');
   };
@@ -657,6 +646,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateRecurring = (id: string, updates: Partial<RecurringRule>) => {
     setRecurring(prev => prev.map(r => (r.id === id ? { ...r, ...updates } : r)));
+    if (isBackendConnected) {
+      api.updateRecurring(id, updates).catch(console.error);
+    }
     showToast('Transaksi berulang diperbarui');
   };
 
@@ -808,11 +800,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         openCatat,
         closeCatat,
         catatInitialMode,
+        catatInitialType,
         toast,
         showToast,
         clearToast,
-        isLocked,
-        setIsLocked,
         isBackendConnected,
         getAccountBalance,
         getTotalNetWorth,

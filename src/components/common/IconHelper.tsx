@@ -20,6 +20,7 @@ import {
   Film,
   CircleEllipsis,
   Tag,
+  Repeat,
   LucideProps,
 } from 'lucide-react';
 
@@ -44,6 +45,7 @@ const iconMap: Record<string, React.FC<LucideProps>> = {
   Film,
   CircleEllipsis,
   Tag,
+  Repeat,
 };
 
 export const getIconComponent = (name: string, fallback = CircleEllipsis): React.FC<LucideProps> => {

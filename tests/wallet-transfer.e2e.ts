@@ -3,7 +3,7 @@ import { expect } from 'e2e';
 
 test('add new wallet and adjust balance', async ({ app, screen }) => {
   await app.open('/');
-  await expect(screen.getByText('Offline SQLite')).toBeVisible();
+  await expect(screen.getByText('On-Device')).toBeVisible();
 
   // Go to Lainnya -> Dompet & Rekening
   await screen.getByRole('button', { name: 'Lainnya', exact: true }).click();
@@ -27,7 +27,7 @@ test('add new wallet and adjust balance', async ({ app, screen }) => {
 
 test('transfer between accounts', async ({ app, screen }) => {
   await app.open('/');
-  await expect(screen.getByText('Offline SQLite')).toBeVisible();
+  await expect(screen.getByText('On-Device')).toBeVisible();
 
   // Go to Lainnya -> Dompet & Rekening
   await screen.getByRole('button', { name: 'Lainnya', exact: true }).click();

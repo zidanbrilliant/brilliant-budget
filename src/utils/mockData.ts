@@ -96,7 +96,5 @@ export const INITIAL_SETTINGS: AppSettings = {
   currency: 'IDR',
   start_day: 1,
   theme: 'pink',
-  pin_enabled: false,
-  pin_hash: '3e6f586ebe5cc35fde9659de4ce0591799eb634bc82eec18492416e991be614a',
   onboarding_completed: true,
 };

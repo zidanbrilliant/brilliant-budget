@@ -16,7 +16,6 @@ import {
   Send,
   Printer,
   Tag,
-  Lock,
   X,
   Edit2,
   Trash2,
@@ -52,7 +51,6 @@ export const LainnyaView: React.FC = () => {
     getMonthSummary,
     settings,
     updateSettings,
-    setIsLocked,
     exportBackupData,
     importBackupData,
     resetAllData,
@@ -359,30 +357,6 @@ export const LainnyaView: React.FC = () => {
               Keamanan & Privasi
             </span>
             <div className="bg-white dark:bg-[#151E2E] rounded-2xl divide-y divide-slate-100 dark:divide-slate-800/80 border border-slate-200/80 dark:border-slate-800/80 shadow-xs overflow-hidden">
-              <div className="p-3.5 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-900 dark:text-white">Kunci PIN / Biometrik</div>
-                    <div className="text-[11px] text-slate-400">Kunci otomatis saat keluar aplikasi</div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    const next = !settings.pin_enabled;
-                    updateSettings({ pin_enabled: next });
-                    if (next) setIsLocked(true);
-                  }}
-                  className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-200 ease-in-out ${
-                    settings.pin_enabled ? 'bg-emerald-600 justify-end' : 'bg-slate-300 dark:bg-slate-700 justify-start'
-                  }`}
-                >
-                  <div className="w-4 h-4 rounded-full bg-white shadow-xs"></div>
-                </button>
-              </div>
-
               <button
                 onClick={() => setActiveSection('backup')}
                 className="w-full p-3.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition text-left"
@@ -911,8 +885,10 @@ export const LainnyaView: React.FC = () => {
             </p>
             <input
               type="number"
-              value={newBalanceInput}
-              onChange={e => setNewBalanceInput(Number(e.target.value))}
+              inputMode="numeric"
+              value={newBalanceInput || ''}
+              placeholder="0"
+              onChange={e => setNewBalanceInput(Math.max(0, Number(e.target.value)))}
               className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm font-bold outline-none tabular-nums"
             />
             <div className="flex gap-2">
@@ -970,8 +946,10 @@ export const LainnyaView: React.FC = () => {
                 <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Saldo Awal (Rp)</label>
                 <input
                   type="number"
-                  value={newWalletBalance}
-                  onChange={e => setNewWalletBalance(Number(e.target.value))}
+                  inputMode="numeric"
+                  value={newWalletBalance || ''}
+                  placeholder="0"
+                  onChange={e => setNewWalletBalance(Math.max(0, Number(e.target.value)))}
                   className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-bold tabular-nums"
                 />
               </div>
@@ -1052,8 +1030,10 @@ export const LainnyaView: React.FC = () => {
                 <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nominal (Rp)</label>
                 <input
                   type="number"
-                  value={transferAmount}
-                  onChange={e => setTransferAmount(Number(e.target.value))}
+                  inputMode="numeric"
+                  value={transferAmount || ''}
+                  placeholder="0"
+                  onChange={e => setTransferAmount(Math.max(0, Number(e.target.value)))}
                   className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl font-bold tabular-nums"
                 />
               </div>
@@ -1062,8 +1042,9 @@ export const LainnyaView: React.FC = () => {
                 <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Biaya Admin (Opsional)</label>
                 <input
                   type="number"
-                  value={transferFee}
-                  onChange={e => setTransferFee(Number(e.target.value))}
+                  inputMode="numeric"
+                  value={transferFee || ''}
+                  onChange={e => setTransferFee(Math.max(0, Number(e.target.value)))}
                   placeholder="0"
                   className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl tabular-nums"
                 />

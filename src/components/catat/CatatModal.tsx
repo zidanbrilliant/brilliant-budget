@@ -35,6 +35,7 @@ export const CatatModal: React.FC = () => {
     isCatatOpen,
     closeCatat,
     catatInitialMode,
+    catatInitialType,
     accounts,
     categories,
     transactions,
@@ -54,7 +55,7 @@ export const CatatModal: React.FC = () => {
   }, [catatInitialMode]);
 
   // Form State
-  const [txnType, setTxnType] = useState<TxnType>('expense');
+  const [txnType, setTxnType] = useState<TxnType>(catatInitialType);
   const [amountStr, setAmountStr] = useState<string>('0');
   const [selectedCategory, setSelectedCategory] = useState<string>('cat-makan');
   const [selectedAccount, setSelectedAccount] = useState<string>('acc-bca');
@@ -65,7 +66,7 @@ export const CatatModal: React.FC = () => {
 
   // Voice State
   const [isRecording, setIsRecording] = useState(false);
-  const [voiceText, setVoiceText] = useState('');
+  const [isVoiceProcessing, setIsVoiceProcessing] = useState(false);
   const [voiceParsedItems, setVoiceParsedItems] = useState<ParsedItem[]>([]);
   const [customVoiceInput, setCustomVoiceInput] = useState<string>('');
 
@@ -84,11 +85,15 @@ export const CatatModal: React.FC = () => {
   // Reset form when modal opens
   useEffect(() => {
     if (isCatatOpen) {
+      setTxnType(catatInitialType);
+      const kind = catatInitialType === 'income' ? 'income' : 'expense';
+      const firstCategory = categories.find(c => c.kind === kind);
+      if (firstCategory) setSelectedCategory(firstCategory.id);
+
       setAmountStr('0');
       setMerchant('');
       setNote('');
       setAdminFee(0);
-      setVoiceText('');
       setVoiceParsedItems([]);
       setCustomVoiceInput('');
       setOcrSampleText('');
@@ -98,13 +103,22 @@ export const CatatModal: React.FC = () => {
       setQrisCustomInput('');
       setQrisData(null);
     }
-  }, [isCatatOpen]);
+  }, [isCatatOpen, catatInitialType]);
 
   if (!isCatatOpen) return null;
 
   const currentAmount = parseInt(amountStr.replace(/\D/g, ''), 10) || 0;
 
-  // Keypad Handlers (FR-2: custom keypad with '000' and 'rb')
+  const handleTypeChange = (type: TxnType) => {
+    setTxnType(type);
+    if (type !== 'transfer') {
+      const kind = type === 'income' ? 'income' : 'expense';
+      const firstCategory = categories.find(c => c.kind === kind);
+      if (firstCategory) setSelectedCategory(firstCategory.id);
+    }
+  };
+
+  // Keypad Handlers (FR-2: custom keypad with '000')
   const handleKeypadPress = (val: string) => {
     if (val === 'C') {
       setAmountStr('0');
@@ -113,11 +127,6 @@ export const CatatModal: React.FC = () => {
     if (val === 'backspace') {
       const next = amountStr.slice(0, -1);
       setAmountStr(next.length ? next : '0');
-      return;
-    }
-    if (val === 'rb') {
-      const num = parseInt(amountStr, 10) || 0;
-      if (num > 0) setAmountStr((num * 1000).toString());
       return;
     }
     if (val === '000') {
@@ -184,9 +193,44 @@ export const CatatModal: React.FC = () => {
 
   // Voice Simulation & Speech Recognition
   const triggerVoiceParse = (text: string) => {
-    setVoiceText(text);
+    setCustomVoiceInput(text);
     const parsed = parseVoiceInput(text);
     setVoiceParsedItems(parsed);
+    if (parsed.length > 0) {
+      setTimeout(() => {
+        document.getElementById('voice-results')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 150);
+    }
+    return parsed;
+  };
+
+  const updateVoiceItem = (index: number, updates: Partial<ParsedItem>) => {
+    setVoiceParsedItems(prev =>
+      prev.map((item, idx) => (idx === index ? { ...item, ...updates } : item))
+    );
+  };
+
+  const handleProcessVoiceInput = () => {
+    const text = customVoiceInput.trim();
+    if (!text) {
+      showToast('Ketik atau dikte transaksi dulu');
+      document.getElementById('custom-voice-input')?.focus();
+      return;
+    }
+
+    setIsVoiceProcessing(true);
+    setTimeout(() => {
+      const parsed = triggerVoiceParse(text);
+      setIsVoiceProcessing(false);
+      const missingAmount = parsed.filter(item => item.amount <= 0).length;
+      if (parsed.length === 0) {
+        showToast('Belum ada transaksi yang bisa dibaca');
+      } else if (missingAmount > 0) {
+        showToast(`${parsed.length} transaksi terbaca, ${missingAmount} nominal perlu diisi`);
+      } else {
+        showToast(`${parsed.length} transaksi berhasil dibaca`);
+      }
+    }, 200);
   };
 
   const handleStartVoice = () => {
@@ -204,7 +248,8 @@ export const CatatModal: React.FC = () => {
           const transcript = event.results[0][0].transcript;
           setIsRecording(false);
           setCustomVoiceInput(transcript);
-          triggerVoiceParse(transcript);
+          const parsed = triggerVoiceParse(transcript);
+          showToast(`${parsed.length} transaksi terbaca dari suara`);
         };
 
         recognition.onerror = () => {
@@ -249,7 +294,14 @@ export const CatatModal: React.FC = () => {
   };
 
   const handleSaveVoiceItems = (asDraft = false) => {
-    if (voiceParsedItems.length === 0) return;
+    if (voiceParsedItems.length === 0) {
+      showToast('Belum ada transaksi untuk disimpan');
+      return;
+    }
+    if (voiceParsedItems.some(item => item.amount <= 0)) {
+      showToast('Masih ada nominal 0. Lengkapi dulu sebelum menyimpan');
+      return;
+    }
     for (const item of voiceParsedItems) {
       addTransaction({
         type: item.type,
@@ -476,7 +528,12 @@ export const CatatModal: React.FC = () => {
           <div className={`w-10 h-1 ${isPinkTheme ? 'bg-pink-300' : 'bg-slate-300 dark:bg-slate-700'} rounded-full mx-auto mb-3`}></div>
           <div className="flex items-center justify-between">
             <h2 className={`text-sm font-bold tracking-tight ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
-              {isPinkTheme ? 'Catat Pengeluaran Lucu 🎀' : 'Catat Transaksi'}
+              {txnType === 'income'
+                ? 'Catat Pemasukan'
+                : txnType === 'transfer'
+                ? 'Catat Transfer'
+                : 'Catat Pengeluaran'}{' '}
+              {isPinkTheme ? '🎀' : ''}
             </h2>
             <button
               onClick={closeCatat}
@@ -544,7 +601,7 @@ export const CatatModal: React.FC = () => {
               {/* Type Switcher */}
               <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-semibold">
                 <button
-                  onClick={() => setTxnType('expense')}
+                  onClick={() => handleTypeChange('expense')}
                   className={`flex-1 py-1.5 rounded-lg transition ${
                     txnType === 'expense'
                       ? 'bg-white dark:bg-slate-700 text-rose-600 dark:text-rose-400 shadow-xs font-bold'
@@ -554,7 +611,7 @@ export const CatatModal: React.FC = () => {
                   Uang Keluar
                 </button>
                 <button
-                  onClick={() => setTxnType('income')}
+                  onClick={() => handleTypeChange('income')}
                   className={`flex-1 py-1.5 rounded-lg transition ${
                     txnType === 'income'
                       ? 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-xs font-bold'
@@ -564,7 +621,7 @@ export const CatatModal: React.FC = () => {
                   Uang Masuk
                 </button>
                 <button
-                  onClick={() => setTxnType('transfer')}
+                  onClick={() => handleTypeChange('transfer')}
                   className={`flex-1 py-1.5 rounded-lg transition ${
                     txnType === 'transfer'
                       ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-xs font-bold'
@@ -576,13 +633,25 @@ export const CatatModal: React.FC = () => {
               </div>
 
               {/* Amount Display */}
-              <div className={`text-center py-2.5 rounded-2xl border ${isPinkTheme ? 'bg-white border-pink-200/80 shadow-pink-100/30' : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200/60 dark:border-slate-800'}`}>
+              <div className={`relative text-center py-2.5 rounded-2xl border ${isPinkTheme ? 'bg-white border-pink-200/80 shadow-pink-100/30' : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200/60 dark:border-slate-800'}`}>
                 <span className={`text-[10px] font-bold uppercase tracking-widest ${isPinkTheme ? 'text-pink-600/70' : 'text-slate-400'}`}>
                   Nominal Transaksi (IDR)
                 </span>
                 <div className={`text-3xl font-extrabold tracking-tight tabular-nums mt-0.5 ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
                   {formatIDR(currentAmount)}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => handleKeypadPress('backspace')}
+                  aria-label="Hapus digit terakhir"
+                  className={`absolute right-2 top-2 w-8 h-8 rounded-lg flex items-center justify-center text-base font-bold transition active:scale-95 ${
+                    isPinkTheme
+                      ? 'bg-pink-100 text-pink-700 hover:bg-pink-200'
+                      : 'bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600'
+                  }`}
+                >
+                  ⌫
+                </button>
               </div>
 
               {/* Template Transaksi 1 Ketuk (FR-4) */}
@@ -740,24 +809,22 @@ export const CatatModal: React.FC = () => {
               )}
 
               {/* Tactile Keypad */}
-              <div className="grid grid-cols-4 gap-1.5 pt-1">
-                {['1', '2', '3', 'backspace', '4', '5', '6', 'rb', '7', '8', '9', '000', 'C', '0'].map(
+              <div className="grid grid-cols-3 gap-1.5 pt-1">
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '000'].map(
                   key => {
                     return (
                       <button
                         key={key}
                         onClick={() => handleKeypadPress(key)}
-                        className={`py-3 rounded-2xl text-base font-bold transition active:scale-95 tabular-nums ${
-                          key === 'backspace'
-                            ? isPinkTheme ? 'bg-pink-100 text-pink-700' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-200'
-                            : key === 'rb' || key === '000'
+                        className={`py-2.5 rounded-xl text-base font-bold transition active:scale-95 tabular-nums ${
+                          key === '000'
                             ? isPinkTheme ? 'bg-pink-100 text-pink-700 font-extrabold border border-pink-300' : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-extrabold border border-emerald-200/50 dark:border-emerald-800/50'
                             : key === 'C'
                             ? isPinkTheme ? 'bg-pink-100/80 text-pink-700' : 'bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                             : isPinkTheme ? 'bg-white hover:bg-pink-50 text-[#37131D] shadow-2xs border border-pink-100' : 'bg-slate-100 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-700/80'
                         }`}
                       >
-                        {key === 'backspace' ? '⌫' : key}
+                        {key}
                       </button>
                     );
                   }
@@ -765,7 +832,7 @@ export const CatatModal: React.FC = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-2 pt-1 pb-safe-bottom">
+              <div className={`sticky bottom-0 z-10 flex gap-2 pt-2 pb-1 -mx-4 px-4 ${isPinkTheme ? 'bg-[#FFF5F7]' : 'bg-white dark:bg-[#111827]'}`}>
                 <button
                   onClick={() => handleSaveManual(true)}
                   className={`px-3.5 py-3 rounded-2xl text-xs font-bold transition active:scale-95 min-h-[44px] ${isPinkTheme ? 'bg-pink-100 text-pink-800 hover:bg-pink-200' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200'}`}
@@ -865,8 +932,9 @@ export const CatatModal: React.FC = () => {
                     value={customVoiceInput}
                     onChange={e => setCustomVoiceInput(e.target.value)}
                     onKeyDown={e => {
-                      if (e.key === 'Enter' && customVoiceInput.trim()) {
-                        triggerVoiceParse(customVoiceInput);
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleProcessVoiceInput();
                       }
                     }}
                     placeholder="Ketik atau dikte ucapan transaksi di sini..."
@@ -882,47 +950,83 @@ export const CatatModal: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (customVoiceInput.trim()) triggerVoiceParse(customVoiceInput);
-                    }}
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold active:scale-95 transition"
+                    onClick={handleProcessVoiceInput}
+                    disabled={isVoiceProcessing}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold active:scale-95 transition disabled:opacity-60 whitespace-nowrap"
                   >
-                    Proses
+                    {isVoiceProcessing ? 'Memproses...' : 'Proses'}
                   </button>
                 </div>
               </div>
 
               {/* Parsed Results */}
               {voiceParsedItems.length > 0 && (
-                <div className="space-y-2 pt-2 text-left">
+                <div id="voice-results" className="space-y-2 pt-2 text-left">
                   <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-200">
                     <span>Hasil Ekstraksi ({voiceParsedItems.length} Transaksi)</span>
-                    <span className="text-emerald-600 text-[11px]">On-device NLP</span>
+                    <span className="text-emerald-600 text-[11px]">Bisa diedit</span>
                   </div>
 
                   {voiceParsedItems.map((item, idx) => {
                     const cat = categories.find(c => c.id === item.category_id);
+                    const itemCategories = categories.filter(c =>
+                      item.type === 'income' ? c.kind === 'income' : c.kind === 'expense'
+                    );
                     return (
                       <div
                         key={idx}
-                        className="bg-slate-50 dark:bg-slate-800/80 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700 space-y-1.5"
+                        className="bg-slate-50 dark:bg-slate-800/80 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700 space-y-2"
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-bold text-slate-900 dark:text-white">
-                            {item.merchant || 'Pengeluaran'}
-                          </span>
-                          <span className="text-sm font-extrabold text-slate-900 dark:text-white tabular-nums">
-                            {formatIDR(item.amount)}
-                          </span>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={item.merchant || ''}
+                            onChange={e => updateVoiceItem(idx, { merchant: e.target.value })}
+                            placeholder="Judul transaksi"
+                            className="flex-1 min-w-0 px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 outline-none text-xs font-bold text-slate-900 dark:text-white"
+                          />
+                          <div className="flex items-center gap-1 w-28 shrink-0 px-2 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                            <span className="text-[10px] text-slate-400">Rp</span>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              value={item.amount || ''}
+                              placeholder="0"
+                              onChange={e =>
+                                updateVoiceItem(idx, { amount: Math.max(0, Number(e.target.value)) })
+                              }
+                              className="w-full bg-transparent outline-none text-right text-xs font-bold tabular-nums text-slate-900 dark:text-white"
+                            />
+                          </div>
                         </div>
+
                         <div className="flex items-center gap-2 text-xs">
-                          <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-medium text-[11px]">
-                            {cat?.name || 'Makan'}
-                          </span>
-                          <span className="text-slate-400 text-[11px]">
-                            Keyakinan: {Math.round(item.confidence * 100)}%
+                          <select
+                            value={item.category_id || ''}
+                            onChange={e => updateVoiceItem(idx, { category_id: e.target.value })}
+                            className="px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold outline-none max-w-[55%]"
+                          >
+                            {itemCategories.map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                            {!cat && <option value={item.category_id || ''}>Lainnya</option>}
+                          </select>
+                          <span className="text-slate-400 text-[10px]">
+                            Keyakinan {Math.round(item.confidence * 100)}%
                           </span>
                         </div>
+
+                        {item.amount <= 0 && (
+                          <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                            Nominal belum terbaca. Isi manual sebelum menyimpan.
+                          </p>
+                        )}
+
+                        {item.note && (
+                          <p className="text-[10px] text-slate-400 italic truncate" title={item.note}>
+                            “{item.note}”
+                          </p>
+                        )}
                       </div>
                     );
                   })}

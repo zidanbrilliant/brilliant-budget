@@ -1,13 +1,13 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { Moon, Sun, Lock, Heart, Sparkles } from 'lucide-react';
+import { Moon, Sun, Heart, Sparkles } from 'lucide-react';
 
 interface IOSFrameProps {
   children: React.ReactNode;
 }
 
 export const IOSFrame: React.FC<IOSFrameProps> = ({ children }) => {
-  const { settings, updateSettings, setIsLocked, isBackendConnected } = useApp();
+  const { settings, updateSettings, isBackendConnected } = useApp();
 
   const cycleTheme = () => {
     if (settings.theme === 'pink') {
@@ -39,16 +39,6 @@ export const IOSFrame: React.FC<IOSFrameProps> = ({ children }) => {
           </div>
 
           <div className="flex items-center gap-1">
-            {/* Lock App */}
-            <button
-              onClick={() => setIsLocked(true)}
-              className={`w-9 h-9 rounded-xl flex items-center justify-center transition active:scale-95 ${isPinkTheme ? 'text-pink-600 hover:bg-pink-100/60' : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-              title="Kunci Aplikasi"
-              aria-label="Kunci Aplikasi"
-            >
-              <Lock className="w-4 h-4" />
-            </button>
-
             {/* 3-Mode Theme Cycler: Pink Cute -> Light -> Dark */}
             <button
               onClick={cycleTheme}

@@ -13,7 +13,7 @@ import {
   Check,
   PiggyBank,
 } from 'lucide-react';
-import { BudgetMethod, BudgetLine, Goal } from '../../types/index.ts';
+import { BudgetMethod, BudgetLine, Goal, RecurringRule, TxnType } from '../../types/index.ts';
 
 export const BudgetView: React.FC = () => {
   const {
@@ -27,12 +27,15 @@ export const BudgetView: React.FC = () => {
     getCategorySpending,
     recurring,
     addRecurring,
+    updateRecurring,
+    deleteRecurring,
     goals,
     contributeToGoal,
     addGoal,
     updateGoal,
     deleteGoal,
     settings,
+    showToast,
   } = useApp();
 
   const isPinkTheme = settings.theme === 'pink';
@@ -66,8 +69,9 @@ export const BudgetView: React.FC = () => {
   const [contributeAmount, setContributeAmount] = useState<number>(100000);
   const [contributeAccountId, setContributeAccountId] = useState<string>('');
 
-  // New Recurring modal state
+  // New / Edit Recurring modal state
   const [isAddRecurringOpen, setIsAddRecurringOpen] = useState(false);
+  const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null);
   const [recName, setRecName] = useState('');
   const [recAmount, setRecAmount] = useState(0);
   const [recDay, setRecDay] = useState(1);
@@ -75,6 +79,8 @@ export const BudgetView: React.FC = () => {
   const [recTenor, setRecTenor] = useState(12);
   const [recAccount, setRecAccount] = useState('acc-bca');
   const [recCategory, setRecCategory] = useState('cat-hiburan');
+  const [recType, setRecType] = useState<TxnType>('expense');
+  const [recMode, setRecMode] = useState<'auto' | 'draft'>('auto');
 
   // Summary
   const summary = getMonthSummary();
@@ -82,15 +88,30 @@ export const BudgetView: React.FC = () => {
   const totalSpent = summary.expense;
   const spentPercent = totalBudget > 0 ? Math.min(100, Math.round((totalSpent / totalBudget) * 100)) : 0;
 
-  const subscriptions = recurring.filter(r => r.is_subscription);
+  const subscriptions = recurring.filter(r => r.is_subscription && r.type === 'expense');
   const monthlySubCost = subscriptions.reduce((sum, r) => sum + r.amount, 0);
   const annualSubCost = monthlySubCost * 12;
 
+  // Semua biaya rutin (langganan + cicilan) mengurangi jatah budget kategori
+  const monthlyCommittedCost = recurring
+    .filter(r => r.is_active && r.type === 'expense')
+    .reduce((sum, r) => sum + r.amount, 0);
+  const availableForCategories = Math.max(0, totalBudget - monthlyCommittedCost);
+  const categoryAllocated = budget.lines.reduce((sum, l) => sum + (l.amount || 0), 0);
+
   const expenseCategories = categories.filter(c => c.kind === 'expense');
+  const recurringCategories = categories.filter(c => (recType === 'income' ? c.kind === 'income' : c.kind === 'expense'));
+
+  const draftCategoryTotal = expenseCategories.reduce(
+    (sum, c) => sum + Math.max(0, customCategoryAmounts[c.id] || 0),
+    0
+  );
+  const draftMaxAllocation = Math.max(0, Math.max(0, totalLimitInput) - monthlyCommittedCost);
 
   const openEditBudgetModal = () => {
     setSelectedMethod(budget.method);
-    setTotalLimitInput(budget.total_limit);
+    const lineTotal = budget.lines.reduce((sum, l) => sum + (l.amount || 0), 0);
+    setTotalLimitInput(budget.total_limit || lineTotal);
 
     // Initialize custom category amounts map
     const amounts: Record<string, number> = {};
@@ -126,10 +147,25 @@ export const BudgetView: React.FC = () => {
         }
       });
 
+      const monthlyLimit = Math.max(0, totalLimitInput);
+      const maxAllocation = Math.max(0, monthlyLimit - monthlyCommittedCost);
+
+      if (monthlyLimit <= 0) {
+        showToast('Tentukan dulu batas budget bulanan');
+        return;
+      }
+
+      if (computedTotal > maxAllocation) {
+        showToast(
+          `Total kategori ${formatIDR(computedTotal)} melebihi jatah ${formatIDR(maxAllocation)} (budget bulanan dikurangi biaya rutin ${formatIDR(monthlyCommittedCost)})`
+        );
+        return;
+      }
+
       updateBudget({
         ...budget,
         method: selectedMethod,
-        total_limit: computedTotal,
+        total_limit: monthlyLimit,
         lines: newLines,
       });
     } else {
@@ -145,6 +181,19 @@ export const BudgetView: React.FC = () => {
 
   const handleSaveQuickLine = () => {
     if (!editingLineCatId) return;
+    const otherLinesTotal = budget.lines
+      .filter(l => l.category_id !== editingLineCatId)
+      .reduce((sum, l) => sum + (l.amount || 0), 0);
+    const nextTotal = otherLinesTotal + Math.max(0, editingLineAmount);
+    const maxAllocation = Math.max(0, totalBudget - monthlyCommittedCost);
+
+    if (nextTotal > maxAllocation) {
+      showToast(
+        `Anggaran kategori melebihi jatah ${formatIDR(maxAllocation)} (budget bulanan - biaya rutin)`
+      );
+      return;
+    }
+
     updateBudgetLine(editingLineCatId, editingLineAmount, editingLineRollover);
     setEditingLineCatId(null);
   };
@@ -204,25 +253,96 @@ export const BudgetView: React.FC = () => {
     setContributeGoal(null);
   };
 
-  const handleCreateRecurring = () => {
-    if (!recName.trim() || recAmount <= 0) return;
-    addRecurring({
+  const getNextRunForDay = (day: number) => {
+    const now = new Date();
+    const safeDay = Math.min(Math.max(1, Math.round(day) || 1), 31);
+    const build = (year: number, month: number) => {
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      return new Date(year, month, Math.min(safeDay, lastDay), 8, 0, 0, 0).getTime();
+    };
+    let next = build(now.getFullYear(), now.getMonth());
+    if (next <= now.getTime()) next = build(now.getFullYear(), now.getMonth() + 1);
+    return next;
+  };
+
+  const resetRecurringForm = () => {
+    setEditingRecurringId(null);
+    setRecName('');
+    setRecAmount(0);
+    setRecDay(1);
+    setRecIsSub(true);
+    setRecTenor(12);
+    setRecAccount(accounts[0]?.id || 'acc-bca');
+    setRecType('expense');
+    setRecMode('auto');
+    setRecCategory(categories.find(c => c.kind === 'expense')?.id || 'cat-hiburan');
+  };
+
+  const openAddRecurring = () => {
+    resetRecurringForm();
+    setIsAddRecurringOpen(true);
+  };
+
+  const openEditRecurring = (rule: RecurringRule) => {
+    setEditingRecurringId(rule.id);
+    setRecName(rule.name);
+    setRecAmount(rule.amount);
+    setRecDay(rule.day_of_month || 1);
+    setRecIsSub(Boolean(rule.is_subscription));
+    setRecTenor(rule.total_tenor || 12);
+    setRecAccount(rule.account_id || accounts[0]?.id || 'acc-bca');
+    setRecCategory(rule.category_id || categories.find(c => c.kind === rule.type)?.id || 'cat-lainnya');
+    setRecType(rule.type);
+    setRecMode(rule.mode);
+    setIsAddRecurringOpen(true);
+  };
+
+  const handleSaveRecurring = () => {
+    if (!recName.trim() || recAmount <= 0) {
+      showToast('Isi nama dan nominal yang valid');
+      return;
+    }
+
+    const existing = editingRecurringId
+      ? recurring.find(r => r.id === editingRecurringId)
+      : undefined;
+    const isInstallment = recType === 'expense' && !recIsSub;
+    const remainingTenor = isInstallment
+      ? existing && existing.total_tenor === recTenor && typeof existing.remaining_tenor === 'number'
+        ? existing.remaining_tenor
+        : recTenor
+      : undefined;
+
+    const payload: Omit<RecurringRule, 'id'> = {
       name: recName.trim(),
-      type: 'expense',
+      type: recType,
       amount: recAmount,
       account_id: recAccount || accounts[0]?.id || 'acc-bca',
       category_id: recCategory,
       frequency: 'monthly',
       day_of_month: recDay,
-      next_run_at: Date.now() + 30 * 86400000,
-      mode: 'auto',
+      next_run_at: getNextRunForDay(recDay),
+      mode: recMode,
       is_active: true,
-      is_subscription: recIsSub,
-      total_tenor: recIsSub ? undefined : recTenor,
-      remaining_tenor: recIsSub ? undefined : recTenor,
-    });
-    setRecName('');
+      is_subscription: recType === 'expense' ? recIsSub : false,
+      total_tenor: isInstallment ? recTenor : undefined,
+      remaining_tenor: remainingTenor,
+    };
+
+    if (editingRecurringId) {
+      updateRecurring(editingRecurringId, payload);
+    } else {
+      addRecurring(payload);
+    }
+
     setIsAddRecurringOpen(false);
+    setEditingRecurringId(null);
+  };
+
+  const handleDeleteRecurring = (rule: RecurringRule) => {
+    if (window.confirm(`Hapus "${rule.name}" dari daftar langganan/rutinitas?`)) {
+      deleteRecurring(rule.id);
+    }
   };
 
   return (
@@ -287,59 +407,100 @@ export const BudgetView: React.FC = () => {
             isPinkTheme
               ? 'bg-gradient-to-br from-[#E11D48] to-[#BE123C] text-white shadow-rose-200/50'
               : 'bg-[#0F172A] dark:bg-[#111827] text-white border border-slate-800'
-          } p-5 rounded-2xl shadow-xs space-y-3`}>
-            <div className={`flex items-center justify-between ${isPinkTheme ? 'text-pink-100' : 'text-slate-400'} text-xs font-medium`}>
-              <span>Batas Pengeluaran Bulan Ini</span>
-              <span>Hari Mulai: Tgl {budget.start_day}</span>
+          } p-4.5 rounded-2xl shadow-xs space-y-3.5`}>
+            <div className={`flex items-center justify-between ${isPinkTheme ? 'text-pink-100' : 'text-slate-400'} text-[11px] font-semibold`}>
+              <span className="uppercase tracking-wider">Budget Bulanan</span>
+              <span className={`px-2 py-0.5 rounded-full ${isPinkTheme ? 'bg-white/15' : 'bg-white/10'}`}>
+                Mulai tgl {budget.start_day}
+              </span>
             </div>
 
-            <div className="flex items-baseline justify-between">
-              <div>
-                <span className="text-2xl font-black tabular-nums">{formatIDR(totalSpent)}</span>
-                <span className="text-xs text-slate-400 ml-1 tabular-nums">
-                  / {formatIDR(totalBudget)}
-                </span>
+            <div className="flex items-end justify-between gap-2">
+              <div className="min-w-0">
+                <div className={`text-[11px] ${isPinkTheme ? 'text-pink-100' : 'text-slate-400'}`}>Sisa anggaran</div>
+                <div className="text-2xl font-black tabular-nums truncate">
+                  {formatIDR(Math.max(0, totalBudget - totalSpent))}
+                </div>
+                <div className={`text-[11px] ${isPinkTheme ? 'text-pink-100/90' : 'text-slate-400'} tabular-nums mt-0.5`}>
+                  dari {formatIDR(totalBudget)}
+                </div>
               </div>
               <span
-                className={`text-xs font-bold px-2 py-0.5 rounded-md tabular-nums ${
+                className={`text-xs font-bold px-2 py-1 rounded-lg tabular-nums shrink-0 ${
                   spentPercent >= 100
-                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                    ? 'bg-rose-500/25 text-rose-100 border border-rose-400/40'
                     : spentPercent >= 80
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                    : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    ? 'bg-amber-400/20 text-amber-100 border border-amber-300/40'
+                    : 'bg-emerald-400/20 text-emerald-100 border border-emerald-300/40'
                 }`}
               >
-                {spentPercent}%
+                {spentPercent}% terpakai
               </span>
             </div>
 
             {/* Main Bar */}
-            <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+            <div className={`w-full ${isPinkTheme ? 'bg-black/20' : 'bg-slate-800'} rounded-full h-2 overflow-hidden`}>
               <div
                 className={`h-full rounded-full transition-all duration-300 ${
                   spentPercent >= 100
-                    ? 'bg-rose-500'
+                    ? 'bg-rose-400'
                     : spentPercent >= 80
-                    ? 'bg-amber-400'
-                    : 'bg-emerald-500'
+                    ? 'bg-amber-300'
+                    : 'bg-emerald-400'
                 }`}
                 style={{ width: `${spentPercent}%` }}
               ></div>
             </div>
 
+            {/* Ringkasan alokasi */}
+            <div className="grid grid-cols-3 gap-1.5 text-center">
+              <div className={`rounded-xl px-1.5 py-2 ${isPinkTheme ? 'bg-white/10' : 'bg-white/5'}`}>
+                <div className={`text-[9px] uppercase tracking-wide ${isPinkTheme ? 'text-pink-100' : 'text-slate-400'}`}>Terpakai</div>
+                <div className="text-[11px] font-bold tabular-nums mt-0.5 truncate">{formatCompactIDR(totalSpent)}</div>
+              </div>
+              <div className={`rounded-xl px-1.5 py-2 ${isPinkTheme ? 'bg-white/10' : 'bg-white/5'}`}>
+                <div className={`text-[9px] uppercase tracking-wide ${isPinkTheme ? 'text-pink-100' : 'text-slate-400'}`}>Biaya rutin</div>
+                <div className="text-[11px] font-bold tabular-nums mt-0.5 truncate">{formatCompactIDR(monthlyCommittedCost)}</div>
+              </div>
+              <div className={`rounded-xl px-1.5 py-2 ${isPinkTheme ? 'bg-white/10' : 'bg-white/5'}`}>
+                <div className={`text-[9px] uppercase tracking-wide ${isPinkTheme ? 'text-pink-100' : 'text-slate-400'}`}>Jatah kategori</div>
+                <div className="text-[11px] font-bold tabular-nums mt-0.5 truncate">{formatCompactIDR(availableForCategories)}</div>
+              </div>
+            </div>
+
+            {monthlyCommittedCost > 0 && (
+              <p className={`text-[10px] leading-relaxed ${isPinkTheme ? 'text-pink-100/90' : 'text-slate-400'}`}>
+                Budget kategori dibatasi {formatIDR(availableForCategories)} setelah dipotong biaya langganan/rutin {formatIDR(monthlyCommittedCost)}.
+              </p>
+            )}
+
             {spentPercent >= 100 && (
-              <div className="flex items-center gap-1.5 text-xs text-rose-300 bg-rose-500/10 p-2 rounded-lg border border-rose-500/20">
-                <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+              <div className="flex items-center gap-1.5 text-xs text-rose-100 bg-rose-950/30 p-2 rounded-lg border border-rose-400/30">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-rose-200" />
                 <span>Peringatan: Anggaran bulan ini telah melampaui batas!</span>
               </div>
             )}
             {spentPercent >= 80 && spentPercent < 100 && (
-              <div className="flex items-center gap-1.5 text-xs text-amber-300 bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
-                <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+              <div className="flex items-center gap-1.5 text-xs text-amber-100 bg-amber-950/25 p-2 rounded-lg border border-amber-300/30">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-amber-200" />
                 <span>Peringatan: Pemakaian anggaran di atas 80%.</span>
               </div>
             )}
           </div>
+
+          {categoryAllocated > availableForCategories && (
+            <div className={`flex items-start gap-2 p-3 rounded-xl border text-[11px] ${
+              isPinkTheme
+                ? 'bg-pink-50 border-pink-200 text-pink-800'
+                : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900/60 text-amber-800 dark:text-amber-200'
+            }`}>
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                Alokasi kategori {formatIDR(categoryAllocated)} melebihi jatah {formatIDR(availableForCategories)}.
+                Kurangi anggaran kategori atau naikkan budget bulanan.
+              </span>
+            </div>
+          )}
 
           {/* Metode 50/30/20 */}
           {budget.method === 'percent' && (
@@ -484,30 +645,40 @@ export const BudgetView: React.FC = () => {
               : 'bg-[#0F172A] dark:bg-[#111827] text-white border border-slate-800'
           } p-4 rounded-2xl shadow-xs`}>
             <span className={`text-[10px] ${isPinkTheme ? 'text-pink-100' : 'text-slate-400'} font-bold uppercase tracking-wider block`}>
-              Total Biaya Langganan Rutin
+              Total Biaya Rutin Bulanan
             </span>
-            <div className="flex items-baseline justify-between mt-1">
-              <div>
+            <div className="flex items-end justify-between gap-2 mt-1">
+              <div className="min-w-0">
                 <span className="text-2xl font-black tabular-nums">{formatIDR(monthlySubCost)}</span>
                 <span className="text-xs text-slate-400 ml-1">/ bulan</span>
               </div>
-              <div className="text-xs text-slate-400 tabular-nums">
-                ≈ {formatCompactIDR(annualSubCost)} / thn
+              <div className="text-[11px] text-slate-400 tabular-nums text-right shrink-0">
+                <div>{subscriptions.length} langganan</div>
+                <div>≈ {formatCompactIDR(annualSubCost)} / thn</div>
               </div>
             </div>
+            {monthlyCommittedCost > monthlySubCost && (
+              <p className={`text-[10px] mt-1.5 ${isPinkTheme ? 'text-pink-100/90' : 'text-slate-400'}`}>
+                Termasuk cicilan: total komitmen rutin {formatIDR(monthlyCommittedCost)}/bulan.
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between px-1">
               <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                Pengeluaran Terjadwal ({recurring.length})
+                Langganan & Rutinitas ({recurring.length})
               </h3>
               <button
-                onClick={() => setIsAddRecurringOpen(true)}
-                className="flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950 px-2.5 py-1.5 rounded-lg transition active:scale-95"
+                onClick={openAddRecurring}
+                className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg transition active:scale-95 ${
+                  isPinkTheme
+                    ? 'text-rose-600 bg-pink-100 hover:bg-pink-200'
+                    : 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950 hover:bg-emerald-100'
+                }`}
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ Langganan</span>
+                <span>Langganan</span>
               </button>
             </div>
 
@@ -518,45 +689,85 @@ export const BudgetView: React.FC = () => {
                     Belum ada langganan atau cicilan
                   </p>
                   <p className="text-[11px] text-slate-400">
-                    Ketuk tombol + Langganan untuk menambahkan layanan rutin.
+                    Ketuk tombol Langganan untuk menambahkan layanan rutin.
                   </p>
                 </div>
               ) : (
                 recurring.map(rule => {
+                  const cat = categories.find(c => c.id === rule.category_id);
                   return (
                     <div
                       key={rule.id}
-                      className="p-3.5 flex items-center justify-between gap-3"
+                      className={`p-3.5 flex items-start justify-between gap-2 ${rule.is_active ? '' : 'opacity-60'}`}
                     >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
-                          <Repeat className="w-4 h-4" />
+                      <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-white"
+                          style={{ backgroundColor: cat?.color || '#64748B' }}
+                        >
+                          <AppIcon name={cat?.icon || 'Repeat'} className="w-4 h-4 text-white" />
                         </div>
-                        <div>
-                          <div className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">
                             {rule.name}
                           </div>
-                          <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                          <div className="text-[11px] text-slate-400 flex items-center flex-wrap gap-x-1.5 gap-y-0.5 mt-0.5">
                             <span>Tiap tgl {rule.day_of_month || 1}</span>
+                            <span>•</span>
+                            <span>{cat?.name || (rule.type === 'income' ? 'Pemasukan' : 'Pengeluaran')}</span>
                             {rule.total_tenor && (
                               <>
                                 <span>•</span>
                                 <span className="font-semibold text-emerald-600">
-                                  Tenor: {rule.remaining_tenor}/{rule.total_tenor} bln
+                                  Tenor {rule.remaining_tenor}/{rule.total_tenor}
                                 </span>
                               </>
+                            )}
+                            {!rule.is_active && (
+                              <span className="text-[9px] font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                                Nonaktif
+                              </span>
                             )}
                           </div>
                         </div>
                       </div>
 
-                      <div className="text-right">
-                        <div className="text-xs font-bold tabular-nums text-slate-900 dark:text-white">
-                          {formatIDR(rule.amount)}
+                      <div className="text-right shrink-0">
+                        <div className={`text-xs font-bold tabular-nums ${rule.type === 'income' ? 'text-emerald-600' : 'text-slate-900 dark:text-white'}`}>
+                          {rule.type === 'income' ? '+' : ''}{formatIDR(rule.amount)}
                         </div>
-                        <span className="text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-1 py-0.2 rounded font-medium">
+                        <span
+                          title={
+                            rule.mode === 'auto'
+                              ? 'Otomatis: transaksi langsung dicatat saat jatuh tempo.'
+                              : 'Draft: transaksi masuk draf dan perlu dikonfirmasi di Beranda.'
+                          }
+                          className={`inline-block mt-0.5 text-[9px] px-1.5 py-0.5 rounded font-semibold cursor-help ${
+                            rule.mode === 'auto'
+                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300'
+                              : 'bg-amber-50 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300'
+                          }`}
+                        >
                           {rule.mode === 'auto' ? 'Otomatis' : 'Draft'}
                         </span>
+                        <div className="flex items-center justify-end gap-1 mt-1">
+                          <button
+                            onClick={() => openEditRecurring(rule)}
+                            aria-label={`Edit ${rule.name}`}
+                            title="Edit"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRecurring(rule)}
+                            aria-label={`Hapus ${rule.name}`}
+                            title="Hapus"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -620,16 +831,16 @@ export const BudgetView: React.FC = () => {
                     } space-y-3`}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white truncate" title={goal.name}>
                           {goal.name}
                         </h4>
-                        <div className="text-xs text-slate-400 mt-0.5 tabular-nums">
+                        <div className="text-xs text-slate-400 mt-0.5 tabular-nums truncate">
                           Sisa: {formatIDR(remaining)}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-md tabular-nums ${
                           isPinkTheme
                             ? 'bg-pink-100 text-pink-700'
@@ -661,8 +872,8 @@ export const BudgetView: React.FC = () => {
                       ></div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-1">
-                      <div className="text-xs">
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <div className="text-xs min-w-0 truncate">
                         <span className={`font-bold tabular-nums ${isPinkTheme ? 'text-rose-600' : 'text-slate-900 dark:text-white'}`}>
                           {formatCompactIDR(goal.saved_amount)}
                         </span>
@@ -670,7 +881,7 @@ export const BudgetView: React.FC = () => {
                       </div>
                       <button
                         onClick={() => openContributeModal(goal)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition active:scale-95 ${
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition active:scale-95 shrink-0 whitespace-nowrap ${
                           isPinkTheme
                             ? 'bg-rose-50 text-rose-600 hover:bg-rose-100'
                             : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 hover:bg-emerald-100'
@@ -745,48 +956,79 @@ export const BudgetView: React.FC = () => {
 
               {/* Custom Category Amounts (when category or envelope method) */}
               {selectedMethod === 'category' || selectedMethod === 'envelope' ? (
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className={`text-[11px] font-bold uppercase ${isPinkTheme ? 'text-pink-600/80' : 'text-slate-400'}`}>
-                      Batas Tiap Kategori (Dapat Berbeda-beda)
+                <div className="space-y-2.5">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">
+                      Batas Budget Bulanan (Rp)
                     </label>
-                    <span className={`text-[10px] font-bold tabular-nums ${isPinkTheme ? 'text-rose-600' : 'text-emerald-600'}`}>
-                      Total: {formatIDR(expenseCategories.reduce((sum, c) => sum + Math.max(0, customCategoryAmounts[c.id] || 0), 0))}
-                    </span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={totalLimitInput || ''}
+                      onChange={e => setTotalLimitInput(Math.max(0, Number(e.target.value)))}
+                      placeholder="Mis. 5000000"
+                      className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm font-bold outline-none tabular-nums"
+                    />
+                    <div className="flex items-center justify-between gap-2 mt-1 text-[10px]">
+                      <span className="text-slate-400">
+                        Biaya rutin: <span className="font-semibold text-slate-600 dark:text-slate-300">{formatIDR(monthlyCommittedCost)}</span>
+                      </span>
+                      <span className={`font-bold tabular-nums ${isPinkTheme ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        Maks kategori: {formatIDR(draftMaxAllocation)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1 scrollbar-none">
-                    {expenseCategories.map(c => (
-                      <div
-                        key={c.id}
-                        className={`p-2 rounded-xl border flex items-center justify-between gap-2 ${isPinkTheme ? 'bg-pink-50/60 border-pink-100' : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200/60 dark:border-slate-700/60'}`}
-                      >
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <div
-                            className="w-6 h-6 rounded-lg flex items-center justify-center text-white shrink-0 text-xs"
-                            style={{ backgroundColor: c.color }}
-                          >
-                            <AppIcon name={c.icon} className="w-3.5 h-3.5 text-white" />
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className={`text-[11px] font-bold uppercase ${isPinkTheme ? 'text-pink-600/80' : 'text-slate-400'}`}>
+                        Batas Tiap Kategori
+                      </label>
+                      <span className={`text-[10px] font-bold tabular-nums ${draftCategoryTotal > draftMaxAllocation ? 'text-rose-500' : isPinkTheme ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        {formatIDR(draftCategoryTotal)} / {formatIDR(draftMaxAllocation)}
+                      </span>
+                    </div>
+                    {draftCategoryTotal > draftMaxAllocation && (
+                      <p className="text-[10px] text-rose-500 font-semibold mb-1.5">
+                        Total kategori melebihi jatah. Kurangi nominal atau naikkan budget bulanan.
+                      </p>
+                    )}
+                    <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1 scrollbar-none">
+                      {expenseCategories.map(c => (
+                        <div
+                          key={c.id}
+                          className={`p-2 rounded-xl border flex items-center justify-between gap-2 ${isPinkTheme ? 'bg-pink-50/60 border-pink-100' : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200/60 dark:border-slate-700/60'}`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <div
+                              className="w-6 h-6 rounded-lg flex items-center justify-center text-white shrink-0 text-xs"
+                              style={{ backgroundColor: c.color }}
+                            >
+                              <AppIcon name={c.icon} className="w-3.5 h-3.5 text-white" />
+                            </div>
+                            <span className={`font-semibold text-xs truncate ${isPinkTheme ? 'text-pink-900' : 'text-slate-800 dark:text-slate-200'}`}>
+                              {c.name}
+                            </span>
                           </div>
-                          <span className={`font-semibold text-xs truncate ${isPinkTheme ? 'text-pink-900' : 'text-slate-800 dark:text-slate-200'}`}>
-                            {c.name}
-                          </span>
+                          <div className="flex items-center gap-1 w-28 shrink-0">
+                            <span className="text-[10px] text-slate-400">Rp</span>
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              value={customCategoryAmounts[c.id] || ''}
+                              placeholder="0"
+                              onChange={e =>
+                                setCustomCategoryAmounts({
+                                  ...customCategoryAmounts,
+                                  [c.id]: Math.max(0, Number(e.target.value)),
+                                })
+                              }
+                              className={`w-full px-2 py-1 rounded-lg text-right font-bold text-xs outline-none tabular-nums ${isPinkTheme ? 'bg-white text-rose-600 border border-pink-200' : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white'}`}
+                            />
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1 w-28 shrink-0">
-                          <span className="text-[10px] text-slate-400">Rp</span>
-                          <input
-                            type="number"
-                            value={customCategoryAmounts[c.id] || 0}
-                            onChange={e =>
-                              setCustomCategoryAmounts({
-                                ...customCategoryAmounts,
-                                [c.id]: Number(e.target.value),
-                              })
-                            }
-                            className={`w-full px-2 py-1 rounded-lg text-right font-bold text-xs outline-none tabular-nums ${isPinkTheme ? 'bg-white text-rose-600 border border-pink-200' : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white'}`}
-                          />
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -796,8 +1038,10 @@ export const BudgetView: React.FC = () => {
                   </label>
                   <input
                     type="number"
-                    value={totalLimitInput}
-                    onChange={e => setTotalLimitInput(Number(e.target.value))}
+                    inputMode="numeric"
+                    value={totalLimitInput || ''}
+                    placeholder="Mis. 5000000"
+                    onChange={e => setTotalLimitInput(Math.max(0, Number(e.target.value)))}
                     className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-sm font-bold outline-none tabular-nums"
                   />
                 </div>
@@ -857,10 +1101,15 @@ export const BudgetView: React.FC = () => {
                 </label>
                 <input
                   type="number"
-                  value={editingLineAmount}
-                  onChange={e => setEditingLineAmount(Number(e.target.value))}
+                  inputMode="numeric"
+                  value={editingLineAmount || ''}
+                  placeholder="0"
+                  onChange={e => setEditingLineAmount(Math.max(0, Number(e.target.value)))}
                   className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-base font-bold outline-none tabular-nums"
                 />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Maksimal untuk semua kategori: {formatIDR(Math.max(0, totalBudget - monthlyCommittedCost))}
+                </p>
               </div>
 
               <label className={`flex items-center gap-2 cursor-pointer p-2.5 rounded-xl border ${isPinkTheme ? 'bg-pink-50/50 border-pink-200' : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700'}`}>
@@ -918,7 +1167,7 @@ export const BudgetView: React.FC = () => {
                   type="number"
                   inputMode="numeric"
                   value={goalTarget || ''}
-                  onChange={e => setGoalTarget(Number(e.target.value))}
+                  onChange={e => setGoalTarget(Math.max(0, Number(e.target.value)))}
                   placeholder="5000000"
                   className="w-full px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-bold text-sm tabular-nums"
                 />
@@ -1110,97 +1359,218 @@ export const BudgetView: React.FC = () => {
         </div>
       )}
 
-      {/* New Recurring Modal */}
+      {/* Add / Edit Recurring Modal */}
       {isAddRecurringOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#151E2E] rounded-2xl p-5 max-w-sm w-full space-y-3.5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-              Tambah Pengeluaran Rutin
-            </h3>
-            <div className="space-y-2.5 text-xs">
+          <div className="bg-white dark:bg-[#151E2E] rounded-3xl p-5 max-w-sm w-full max-h-[90vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-up">
+            <div className="flex items-center justify-between shrink-0">
               <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nama Layanan</label>
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white">
+                  {editingRecurringId ? 'Edit Langganan / Rutinitas' : 'Tambah Langganan / Rutinitas'}
+                </h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Catat otomatis tiap bulan atau minta konfirmasi dulu.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsAddRecurringOpen(false)}
+                aria-label="Tutup"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs overflow-y-auto pr-1 mt-3 scrollbar-none">
+              {/* Jenis transaksi */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Jenis Transaksi</label>
+                <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRecType('expense');
+                      setRecCategory(categories.find(c => c.kind === 'expense')?.id || 'cat-lainnya');
+                    }}
+                    className={`flex-1 py-2 rounded-lg font-bold text-[11px] transition ${
+                      recType === 'expense' ? 'bg-white dark:bg-slate-700 text-rose-600 shadow-xs' : 'text-slate-500'
+                    }`}
+                  >
+                    Pengeluaran
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRecType('income');
+                      setRecIsSub(false);
+                      setRecCategory(categories.find(c => c.kind === 'income')?.id || 'cat-gaji');
+                    }}
+                    className={`flex-1 py-2 rounded-lg font-bold text-[11px] transition ${
+                      recType === 'income' ? 'bg-white dark:bg-slate-700 text-emerald-600 shadow-xs' : 'text-slate-500'
+                    }`}
+                  >
+                    Pemasukan
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nama</label>
                 <input
                   type="text"
                   value={recName}
                   onChange={e => setRecName(e.target.value)}
-                  placeholder="Mis. Spotify, iCloud, BPJS"
-                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nominal (Rp)</label>
-                <input
-                  type="number"
-                  value={recAmount}
-                  onChange={e => setRecAmount(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-bold tabular-nums"
+                  placeholder={recType === 'income' ? 'Mis. Gaji Pokok, Bonus' : 'Mis. Spotify, iCloud, BPJS'}
+                  className="w-full px-3 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none text-base sm:text-xs font-semibold"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Tanggal Tiap Bulan</label>
+                  <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Nominal (Rp)</label>
                   <input
                     type="number"
-                    min={1}
-                    max={31}
-                    value={recDay}
-                    onChange={e => setRecDay(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none tabular-nums"
+                    inputMode="numeric"
+                    value={recAmount || ''}
+                    placeholder="0"
+                    onChange={e => setRecAmount(Math.max(0, Number(e.target.value)))}
+                    className="w-full px-3 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-bold tabular-nums"
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Jenis</label>
-                  <div className="flex gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setRecIsSub(true)}
-                      className={`flex-1 py-2 rounded-lg font-bold text-[11px] transition ${
-                        recIsSub ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                      }`}
-                    >
-                      Langganan
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRecIsSub(false)}
-                      className={`flex-1 py-2 rounded-lg font-bold text-[11px] transition ${
-                        !recIsSub ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                      }`}
-                    >
-                      Cicilan
-                    </button>
-                  </div>
+                  <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Tanggal</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={31}
+                    value={recDay || ''}
+                    placeholder="1"
+                    onChange={e => setRecDay(Math.min(31, Math.max(1, Number(e.target.value) || 1)))}
+                    className="w-full px-3 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none tabular-nums"
+                  />
                 </div>
               </div>
 
-              {!recIsSub && (
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Total Tenor (Bulan)</label>
-                  <input
-                    type="number"
-                    value={recTenor}
-                    onChange={e => setRecTenor(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none tabular-nums"
-                  />
+                  <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Dompet</label>
+                  <select
+                    value={recAccount}
+                    onChange={e => setRecAccount(e.target.value)}
+                    className="w-full px-2.5 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-semibold text-xs"
+                  >
+                    {accounts.map(a => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Kategori</label>
+                  <select
+                    value={recCategory}
+                    onChange={e => setRecCategory(e.target.value)}
+                    className="w-full px-2.5 py-2.5 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none font-semibold text-xs"
+                  >
+                    {recurringCategories.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Mode pencatatan */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Mode Pencatatan</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setRecMode('auto')}
+                    className={`p-2.5 rounded-xl border text-left transition ${
+                      recMode === 'auto'
+                        ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/60'
+                        : 'border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    <div className={`font-bold text-[11px] ${recMode === 'auto' ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-600 dark:text-slate-300'}`}>
+                      Otomatis
+                    </div>
+                    <div className="text-[9px] text-slate-400 mt-0.5 leading-snug">Langsung dicatat saat jatuh tempo</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRecMode('draft')}
+                    className={`p-2.5 rounded-xl border text-left transition ${
+                      recMode === 'draft'
+                        ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/60'
+                        : 'border-slate-200 dark:border-slate-700'
+                    }`}
+                  >
+                    <div className={`font-bold text-[11px] ${recMode === 'draft' ? 'text-amber-700 dark:text-amber-300' : 'text-slate-600 dark:text-slate-300'}`}>
+                      Draft
+                    </div>
+                    <div className="text-[9px] text-slate-400 mt-0.5 leading-snug">Perlu konfirmasi di Beranda</div>
+                  </button>
+                </div>
+              </div>
+
+              {recType === 'expense' && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Tipe</label>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setRecIsSub(true)}
+                        className={`flex-1 py-2 rounded-lg font-bold text-[11px] transition ${
+                          recIsSub ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                        }`}
+                      >
+                        Langganan
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRecIsSub(false)}
+                        className={`flex-1 py-2 rounded-lg font-bold text-[11px] transition ${
+                          !recIsSub ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                        }`}
+                      >
+                        Cicilan
+                      </button>
+                    </div>
+                  </div>
+                  {!recIsSub && (
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-400 uppercase block mb-1">Tenor (Bulan)</label>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={recTenor || ''}
+                        placeholder="12"
+                        onChange={e => setRecTenor(Math.max(1, Number(e.target.value) || 1))}
+                        className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl outline-none tabular-nums"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            <div className="flex gap-2 pt-1">
+            <div className="flex gap-2 pt-3 shrink-0">
               <button
                 onClick={() => setIsAddRecurringOpen(false)}
-                className="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300"
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300"
               >
                 Batal
               </button>
               <button
-                onClick={handleCreateRecurring}
-                className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500"
+                onClick={handleSaveRecurring}
+                disabled={!recName.trim() || recAmount <= 0}
+                className={`flex-1 py-2.5 rounded-xl text-white text-xs font-bold transition disabled:opacity-50 ${
+                  isPinkTheme ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-600 hover:bg-emerald-500'
+                }`}
               >
-                Simpan
+                {editingRecurringId ? 'Simpan Perubahan' : 'Simpan'}
               </button>
             </div>
           </div>

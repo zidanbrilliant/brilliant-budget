@@ -142,53 +142,65 @@ export const BerandaView: React.FC = () => {
 
       {/* 2. ACTION CAPSULES: Clean Fast-Entry Row */}
       <section>
-        <div className="grid grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-5 gap-1.5">
           <button
             onClick={() => openCatat('manual')}
-            className={`min-h-[64px] flex flex-col items-center justify-center py-3 px-2 ${
+            className={`min-h-[64px] flex flex-col items-center justify-center py-3 px-1.5 ${
               isPinkTheme
                 ? 'bg-white hover:border-pink-300 text-pink-900 border-pink-200/80 shadow-pink-100/20'
                 : 'bg-white dark:bg-[#151E2E] border-slate-200/70 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-emerald-500 shadow-2xs'
             } rounded-2xl border active:scale-95 transition`}
           >
             <Edit3 className={`w-5 h-5 mb-1.5 ${isPinkTheme ? 'text-pink-600' : 'text-slate-700 dark:text-slate-300'}`} />
-            <span className="text-xs font-bold">Ketik</span>
+            <span className="text-[11px] font-bold">Ketik</span>
+          </button>
+
+          <button
+            onClick={() => openCatat('manual', 'income')}
+            className={`min-h-[64px] flex flex-col items-center justify-center py-3 px-1.5 ${
+              isPinkTheme
+                ? 'bg-white hover:border-pink-300 text-pink-900 border-pink-200/80 shadow-pink-100/20'
+                : 'bg-white dark:bg-[#151E2E] border-slate-200/70 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-emerald-500 shadow-2xs'
+            } rounded-2xl border active:scale-95 transition`}
+          >
+            <ArrowDownLeft className={`w-5 h-5 mb-1.5 ${isPinkTheme ? 'text-emerald-600' : 'text-emerald-600 dark:text-emerald-400'}`} />
+            <span className="text-[11px] font-bold">Masuk</span>
           </button>
 
           <button
             onClick={() => openCatat('voice')}
-            className={`min-h-[64px] flex flex-col items-center justify-center py-3 px-2 ${
+            className={`min-h-[64px] flex flex-col items-center justify-center py-3 px-1.5 ${
               isPinkTheme
                 ? 'bg-white hover:border-pink-300 text-pink-900 border-pink-200/80 shadow-pink-100/20'
                 : 'bg-white dark:bg-[#151E2E] border-slate-200/70 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-emerald-500 shadow-2xs'
             } rounded-2xl border active:scale-95 transition`}
           >
             <Mic className={`w-5 h-5 mb-1.5 ${isPinkTheme ? 'text-pink-600' : 'text-slate-700 dark:text-slate-300'}`} />
-            <span className="text-xs font-bold">Suara</span>
+            <span className="text-[11px] font-bold">Suara</span>
           </button>
 
           <button
             onClick={() => openCatat('ocr')}
-            className={`min-h-[64px] flex flex-col items-center justify-center py-3 px-2 ${
+            className={`min-h-[64px] flex flex-col items-center justify-center py-3 px-1.5 ${
               isPinkTheme
                 ? 'bg-white hover:border-pink-300 text-pink-900 border-pink-200/80 shadow-pink-100/20'
                 : 'bg-white dark:bg-[#151E2E] border-slate-200/70 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-emerald-500 shadow-2xs'
             } rounded-2xl border active:scale-95 transition`}
           >
             <Camera className={`w-5 h-5 mb-1.5 ${isPinkTheme ? 'text-pink-600' : 'text-slate-700 dark:text-slate-300'}`} />
-            <span className="text-xs font-bold">Foto Nota</span>
+            <span className="text-[11px] font-bold">Foto Nota</span>
           </button>
 
           <button
             onClick={() => openCatat('qr')}
-            className={`min-h-[64px] flex flex-col items-center justify-center py-3 px-2 ${
+            className={`min-h-[64px] flex flex-col items-center justify-center py-3 px-1.5 ${
               isPinkTheme
                 ? 'bg-white hover:border-pink-300 text-pink-900 border-pink-200/80 shadow-pink-100/20'
                 : 'bg-white dark:bg-[#151E2E] border-slate-200/70 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-emerald-500 shadow-2xs'
             } rounded-2xl border active:scale-95 transition`}
           >
             <QrCode className={`w-5 h-5 mb-1.5 ${isPinkTheme ? 'text-pink-600' : 'text-slate-700 dark:text-slate-300'}`} />
-            <span className="text-xs font-bold">QRIS</span>
+            <span className="text-[11px] font-bold">QRIS</span>
           </button>
         </div>
       </section>

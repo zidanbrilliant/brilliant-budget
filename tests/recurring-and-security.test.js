@@ -1,21 +1,4 @@
 import assert from 'assert';
-import crypto from 'crypto';
-
-console.log('--- Testing Security PIN Utilities ---');
-
-function hashPin(pin) {
-  return crypto.createHash('sha256').update(`catat_salt_${pin}`).digest('hex');
-}
-
-function verifyPin(inputPin, targetHash) {
-  return hashPin(inputPin) === targetHash;
-}
-
-const defaultHash = '3e6f586ebe5cc35fde9659de4ce0591799eb634bc82eec18492416e991be614a';
-assert.strictEqual(hashPin('1234'), defaultHash, 'PIN 1234 hash should match default');
-assert.strictEqual(verifyPin('1234', defaultHash), true, 'PIN 1234 should verify');
-assert.strictEqual(verifyPin('0000', defaultHash), false, 'PIN 0000 should fail');
-console.log('   ✓ PIN hashing & verification verified');
 
 // Test 2: Recurring Scheduler
 console.log('--- Testing Recurring Scheduler ---');
@@ -101,4 +84,4 @@ assert.strictEqual(updated[0].is_active, false, 'Tenor completed rule should dea
 assert.strictEqual(updated[1].is_active, true, 'Non-due rule remains unchanged');
 console.log('   ✓ Recurring rule execution & installment decrement verified');
 
-console.log('=== SEMUA PENGUJIAN RECURRING & SECURITY LULUS ===');
+console.log('=== SEMUA PENGUJIAN RECURRING LULUS ===');

@@ -8,7 +8,6 @@ import { BerandaView } from './components/beranda/BerandaView';
 import { TransaksiView } from './components/transaksi/TransaksiView';
 import { BudgetView } from './components/budget/BudgetView';
 import { LainnyaView } from './components/lainnya/LainnyaView';
-import { LockScreen } from './components/security/LockScreen';
 import { OnboardingModal } from './components/onboarding/OnboardingModal';
 import { consumePendingUpload } from './utils/cameraHelper';
 
@@ -51,7 +50,6 @@ const AppContent: React.FC = () => {
       <TabBar />
       <CatatModal />
       <Toast />
-      <LockScreen />
       <OnboardingModal />
     </>
   );

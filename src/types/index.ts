@@ -126,7 +126,5 @@ export interface AppSettings {
   currency: string;
   start_day: number;
   theme: 'pink' | 'light' | 'dark';
-  pin_enabled: boolean;
-  pin_hash?: string;
   onboarding_completed: boolean;
 }

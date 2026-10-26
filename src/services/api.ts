@@ -42,6 +42,8 @@ export const api = {
   saveBudget: (plan: BudgetPlan) => req<void>('/budget', { method: 'PUT', body: JSON.stringify(plan) }),
   getRecurring: () => req<RecurringRule[]>('/recurring'),
   createRecurring: (rule: Partial<RecurringRule>) => req<RecurringRule>('/recurring', { method: 'POST', body: JSON.stringify(rule) }),
+  updateRecurring: (id: string, updates: Partial<RecurringRule>) =>
+    req<void>(`/recurring/${id}`, { method: 'PUT', body: JSON.stringify(updates) }),
   deleteRecurring: (id: string) => req<void>(`/recurring/${id}`, { method: 'DELETE' }),
   getGoals: () => req<Goal[]>('/goals'),
   createGoal: (goal: Partial<Goal>) => req<Goal>('/goals', { method: 'POST', body: JSON.stringify(goal) }),

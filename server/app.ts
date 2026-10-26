@@ -373,16 +373,16 @@ app.get('/api/recurring', (_req: Request, res: Response) => {
 });
 
 app.post('/api/recurring', (req: Request, res: Response) => {
-  const { name, type = 'expense', amount, account_id, category_id, frequency = 'monthly', day_of_month = 1, mode = 'draft', is_subscription = false, total_tenor, remaining_tenor } = req.body;
+  const { name, type = 'expense', amount, account_id, category_id, frequency = 'monthly', day_of_month = 1, next_run_at, mode = 'draft', is_subscription = false, total_tenor, remaining_tenor } = req.body;
   const id = 'rec-' + Date.now();
-  const next_run_at = Date.now() + 30 * 86400000;
+  const scheduledAt = typeof next_run_at === 'number' ? next_run_at : Date.now() + 30 * 86400000;
 
   db.prepare(`
     INSERT INTO recurring_rule (
       id, name, type, amount, account_id, category_id, frequency, interval,
       day_of_month, next_run_at, mode, is_active, is_subscription, total_tenor, remaining_tenor
     ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, 1, ?, ?, ?)
-  `).run(id, name, type, amount, account_id, category_id || null, frequency, day_of_month, next_run_at, mode, is_subscription ? 1 : 0, total_tenor || null, remaining_tenor || null);
+  `).run(id, name, type, amount, account_id, category_id || null, frequency, day_of_month, scheduledAt, mode, is_subscription ? 1 : 0, total_tenor || null, remaining_tenor || null);
 
   res.status(201).json({ id, name, amount });
 });
@@ -390,6 +390,50 @@ app.post('/api/recurring', (req: Request, res: Response) => {
 app.delete('/api/recurring/:id', (req: Request, res: Response) => {
   const id = String(req.params.id);
   db.prepare('DELETE FROM recurring_rule WHERE id = ?').run(id);
+  res.json({ success: true, id });
+});
+
+app.put('/api/recurring/:id', (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const {
+    name,
+    type,
+    amount,
+    account_id,
+    category_id,
+    frequency,
+    day_of_month,
+    next_run_at,
+    mode,
+    is_active,
+    is_subscription,
+    total_tenor,
+    remaining_tenor,
+  } = req.body;
+
+  db.prepare(`
+    UPDATE recurring_rule SET
+      name = ?, type = ?, amount = ?, account_id = ?, category_id = ?, frequency = ?,
+      day_of_month = ?, next_run_at = ?, mode = ?, is_active = ?, is_subscription = ?,
+      total_tenor = ?, remaining_tenor = ?
+    WHERE id = ?
+  `).run(
+    name,
+    type,
+    amount,
+    account_id,
+    category_id || null,
+    frequency,
+    day_of_month,
+    next_run_at,
+    mode,
+    is_active ? 1 : 0,
+    is_subscription ? 1 : 0,
+    total_tenor || null,
+    remaining_tenor || null,
+    id
+  );
+
   res.json({ success: true, id });
 });
 

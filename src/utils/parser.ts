@@ -10,6 +10,147 @@ export const DEFAULT_TEMPLATES: TxnTemplate[] = [
 
 // Normalisasi angka Indonesia (FR-11, 8.4)
 // "25rb", "25k", "25.000", "Rp 25.000,00", "dua puluh lima ribu", "setengah juta", "1,5 juta"
+const SPOKEN_UNITS: Record<string, number> = {
+  nol: 0,
+  satu: 1,
+  dua: 2,
+  tiga: 3,
+  empat: 4,
+  lima: 5,
+  enam: 6,
+  tujuh: 7,
+  delapan: 8,
+  sembilan: 9,
+  sepuluh: 10,
+  sebelas: 11,
+  seratus: 100,
+  seribu: 1000,
+  sejuta: 1000000,
+  semiliar: 1000000000,
+};
+
+function parseSpokenNumber(text: string): number | null {
+  const tokens = text
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (tokens.length === 0) return null;
+
+  let total = 0;
+  let current = 0;
+  let hasNumberWord = false;
+
+  const addScale = (scale: number) => {
+    total += (current || 1) * scale;
+    current = 0;
+  };
+
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+
+    if (token === 'setengah') {
+      // "setengah juta" = 500 ribu
+      if (tokens[i + 1] === 'juta') {
+        total += 500000;
+        i++;
+        hasNumberWord = true;
+        continue;
+      }
+      if (tokens[i + 1] === 'ribu') {
+        total += 500;
+        i++;
+        hasNumberWord = true;
+        continue;
+      }
+    }
+
+    if (token === 'seratus') {
+      current += 100;
+      hasNumberWord = true;
+      continue;
+    }
+    if (token === 'seribu') {
+      total += 1000;
+      hasNumberWord = true;
+      continue;
+    }
+    if (token === 'sejuta') {
+      total += 1000000;
+      hasNumberWord = true;
+      continue;
+    }
+    if (token === 'semiliar') {
+      total += 1000000000;
+      hasNumberWord = true;
+      continue;
+    }
+
+    if (token === 'puluh') {
+      current = (current || 1) * 10;
+      hasNumberWord = true;
+      continue;
+    }
+    if (token === 'ratus') {
+      current = (current || 1) * 100;
+      hasNumberWord = true;
+      continue;
+    }
+    if (token === 'ribu') {
+      addScale(1000);
+      hasNumberWord = true;
+      continue;
+    }
+    if (token === 'juta') {
+      addScale(1000000);
+      hasNumberWord = true;
+      continue;
+    }
+    if (token === 'miliar') {
+      addScale(1000000000);
+      hasNumberWord = true;
+      continue;
+    }
+
+    const unit = SPOKEN_UNITS[token];
+    if (unit !== undefined) {
+      hasNumberWord = true;
+      const next = tokens[i + 1];
+      if (next === 'belas') {
+        current += unit + 10;
+        i++;
+      } else if (next === 'puluh') {
+        current += unit * 10;
+        i++;
+      } else if (next === 'ratus') {
+        current += unit * 100;
+        i++;
+      } else if (next === 'ribu') {
+        current += unit;
+        total += current * 1000;
+        current = 0;
+        i++;
+      } else if (next === 'juta') {
+        current += unit;
+        total += current * 1000000;
+        current = 0;
+        i++;
+      } else if (next === 'miliar') {
+        current += unit;
+        total += current * 1000000000;
+        current = 0;
+        i++;
+      } else {
+        current += unit;
+      }
+    }
+  }
+
+  if (!hasNumberWord) return null;
+  return total + current;
+}
+
 export function parseIndonesianAmount(text: string): number | null {
   if (!text) return null;
   const clean = text.toLowerCase().trim();
@@ -17,6 +158,12 @@ export function parseIndonesianAmount(text: string): number | null {
   // Pola kata: setengah juta
   if (clean.includes('setengah juta')) return 500000;
   if (clean.includes('satu setengah juta') || clean.includes('1,5 juta') || clean.includes('1.5 juta') || clean.includes('1,5jt')) return 1500000;
+
+  // Angka yang diucapkan penuh: "dua puluh lima ribu", "seratus dua puluh ribu"
+  if (!/\d/.test(clean)) {
+    const spoken = parseSpokenNumber(clean);
+    if (spoken && spoken > 0) return spoken;
+  }
 
   // Pola juta: "2,5 juta", "3 juta", "2.5 jt"
   const jtMatch = clean.match(/([\d.,]+)\s*(juta|jt)/i);
@@ -97,41 +244,76 @@ export function guessAccount(text: string): string {
   return 'acc-bca';
 }
 
+// Kata yang tidak perlu masuk judul transaksi hasil dikte
+const VOICE_FILLER_WORDS = new Set([
+  'beli', 'belanja', 'bayar', 'pake', 'pakai', 'dengan', 'via', 'dari', 'di', 'ke',
+  'untuk', 'buat', 'sebesar', 'senilai', 'rp', 'rupiah', 'idr', 'tunai', 'cash',
+  'gopay', 'bca', 'shopee', 'shopeepay', 'ovo', 'dana', 'linkaja', 'terus', 'lalu',
+  'kemudian', 'dan', 'sama', 'juga', 'aku', 'saya', 'tadi', 'barusan', 'habis',
+  'top', 'up', 'isi', 'transfer', 'masukkan', 'catat', 'pengeluaran', 'pemasukan',
+  'nominal', 'uang', 'sebanyak',
+]);
+
+const NUMBER_WORDS = new Set([
+  ...Object.keys(SPOKEN_UNITS),
+  'puluh', 'ratus', 'ribu', 'juta', 'miliar', 'belas', 'setengah', 'rb', 'jt', 'k',
+]);
+
+function extractVoiceMerchant(clause: string, type: TxnType): string {
+  const cleaned = clause
+    .toLowerCase()
+    .replace(/\b\d[\d.,]*\b/g, ' ')
+    .replace(/[^a-z\s]/g, ' ')
+    .split(/\s+/)
+    .filter(token => token && !VOICE_FILLER_WORDS.has(token) && !NUMBER_WORDS.has(token))
+    .join(' ')
+    .trim();
+
+  if (!cleaned) {
+    return type === 'income' ? 'Pemasukan' : type === 'transfer' ? 'Transfer' : 'Pengeluaran';
+  }
+
+  return cleaned
+    .split(/\s+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 // Parser Voice / Natural Language Indonesia (FR-8, FR-9)
 // Mendukung pemisahan multi transaksi ("beli bensin 50 ribu terus makan siang 30 ribu")
 export function parseVoiceInput(speech: string): ParsedItem[] {
   const trimmed = speech.trim();
   if (!trimmed) return [];
 
-  // Pecah transaksi jika ada pemisah kata penghubung ("terus", "lalu", "dan", "sama", "kemudian")
-  const clauses = trimmed.split(/\s+(?:terus|kemudian|lalu|sama juga)\s+/i);
+  // Pecah transaksi jika ada pemisah kata penghubung ("terus", "lalu", "dan", "kemudian")
+  const clauses = trimmed.split(/\s+(?:terus|kemudian|lalu|sama juga|dan)\s+/i);
 
   const results: ParsedItem[] = [];
 
   for (const clause of clauses) {
     const lower = clause.toLowerCase();
-    
+    if (!lower.trim()) continue;
+
     // Tipe transaksi
     let type: TxnType = 'expense';
-    if (lower.includes('gaji') || lower.includes('dapat uang') || lower.includes('terima') || lower.includes('masuk')) {
+    if (
+      lower.includes('gaji') ||
+      lower.includes('gajian') ||
+      lower.includes('dapat uang') ||
+      lower.includes('terima uang') ||
+      lower.includes('pemasukan') ||
+      lower.includes('pendapatan') ||
+      lower.includes('bonus')
+    ) {
       type = 'income';
     } else if (lower.includes('transfer ke') || lower.includes('top up') || lower.includes('topup')) {
       type = 'transfer';
     }
 
-    const amount = parseIndonesianAmount(clause) || 25000;
+    const amount = parseIndonesianAmount(clause) ?? 0;
     const catId = guessCategory(clause);
     const accId = guessAccount(clause);
-
-    // Ambil perkiraan merchant / note
-    let merchant = '';
-    if (lower.includes('soto')) merchant = 'Soto';
-    else if (lower.includes('kopi')) merchant = 'Kedai Kopi';
-    else if (lower.includes('bensin')) merchant = 'SPBU Pertamina';
-    else if (lower.includes('indomaret')) merchant = 'Indomaret';
-    else if (lower.includes('alfamart')) merchant = 'Alfamart';
-    else if (lower.includes('gojek') || lower.includes('goride')) merchant = 'Gojek';
-    else merchant = clause.split(/(\d+|ribu|rb|k)/)[0].trim() || 'Pengeluaran';
+    const merchant = extractVoiceMerchant(clause, type);
 
     results.push({
       type,
@@ -139,10 +321,10 @@ export function parseVoiceInput(speech: string): ParsedItem[] {
       merchant,
       category_id: catId,
       account_id: accId,
-      note: clause,
-      confidence: 0.89,
+      note: clause.trim(),
+      confidence: amount > 0 ? 0.92 : 0.45,
       source: 'voice',
-      raw_source_text: `"${clause}"`,
+      raw_source_text: `"${clause.trim()}"`,
     });
   }
 
