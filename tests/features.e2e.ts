@@ -117,7 +117,12 @@ test('savings goal tab creates goal with deadline', async ({ app, screen }) => {
 
   await screen.getByPlaceholder('Mis. Dana Darurat, Liburan').fill('Dana Darurat');
   await screen.getByPlaceholder('5000000').fill('12000000');
-  await screen.getByLabel('Tenggat waktu').fill('2027-06-30');
+
+  // Calendar dropdown works and the field also accepts manual DD/MM/YYYY input.
+  await screen.getByRole('button', { name: 'Buka kalender' }).click();
+  await expect(screen.getByRole('dialog', { name: 'Pilih tanggal' })).toBeVisible();
+  await screen.getByRole('button', { name: 'Hari ini' }).click();
+  await screen.getByLabel('Tenggat waktu').fill('30/06/2027');
   await screen.getByRole('button', { name: 'Simpan Target' }).click();
 
   await expect(screen.getByText('Dana Darurat')).toBeVisible();

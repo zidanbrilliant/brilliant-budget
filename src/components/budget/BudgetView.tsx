@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatIDR, formatCompactIDR } from '../../utils/formatters';
 import { AppIcon } from '../common/IconHelper';
+import { DateField } from '../common/DateField';
 import {
   AlertTriangle,
   Plus,
@@ -1439,12 +1440,11 @@ export const BudgetView: React.FC = () => {
                 <label className={labelClass}>
                   Tenggat Waktu <span className="normal-case font-medium text-slate-400/80">(opsional)</span>
                 </label>
-                <input
-                  type="date"
-                  aria-label="Tenggat waktu"
+                <DateField
                   value={goalDueDate}
-                  onChange={e => setGoalDueDate(e.target.value)}
-                  className={`${fieldClass} text-xs font-semibold`}
+                  onChange={setGoalDueDate}
+                  ariaLabel="Tenggat waktu"
+                  isPinkTheme={isPinkTheme}
                 />
               </div>
             </div>
@@ -1606,12 +1606,11 @@ export const BudgetView: React.FC = () => {
                 <label className={labelClass}>
                   Tenggat Waktu <span className="normal-case font-medium text-slate-400/80">(opsional)</span>
                 </label>
-                <input
-                  type="date"
-                  aria-label="Tenggat waktu"
+                <DateField
                   value={editGoalDueDate}
-                  onChange={e => setEditGoalDueDate(e.target.value)}
-                  className={`${fieldClass} text-xs font-semibold`}
+                  onChange={setEditGoalDueDate}
+                  ariaLabel="Tenggat waktu"
+                  isPinkTheme={isPinkTheme}
                 />
               </div>
 
