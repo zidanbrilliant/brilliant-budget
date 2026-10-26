@@ -102,3 +102,26 @@ test('lainnya sub-views navigation', async ({ app, screen }) => {
   await screen.getByText('Kembali ke Pengaturan').click();
   await expect(screen.getByText('Pengaturan')).toBeVisible();
 });
+
+test('savings goal tab creates goal with deadline', async ({ app, screen }) => {
+  await app.open('/');
+  await expect(screen.getByText('On-Device')).toBeVisible();
+
+  await screen.getByRole('button', { name: 'Budget', exact: true }).click();
+  await screen.getByRole('button', { name: 'Target Tabungan', exact: true }).click();
+
+  await expect(screen.getByText('Belum ada target tabungan')).toBeVisible();
+
+  await screen.getByRole('button', { name: 'Buat Target Pertama' }).click();
+  await expect(screen.getByRole('heading', { name: 'Target Tabungan Baru' })).toBeVisible();
+
+  await screen.getByPlaceholder('Mis. Dana Darurat, Liburan').fill('Dana Darurat');
+  await screen.getByPlaceholder('5000000').fill('12000000');
+  await screen.getByLabel('Tenggat waktu').fill('2027-06-30');
+  await screen.getByRole('button', { name: 'Simpan Target' }).click();
+
+  await expect(screen.getByText('Dana Darurat')).toBeVisible();
+  await expect(screen.getByText('30 Jun 2027')).toBeVisible();
+  await expect(screen.getByText('Kurang Rp 12.000.000')).toBeVisible();
+  await expect(screen.getByText('Total terkumpul')).toBeVisible();});
+
