@@ -1,4 +1,4 @@
-import { runScanReceipt } from '../../server/aiHandlers.ts';
+import { runScanReceipt } from '../aiHandlers.ts';
 
 function parseBody(body: unknown): unknown {
   if (typeof body === 'string') {

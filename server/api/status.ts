@@ -1,4 +1,4 @@
-import { runAIStatus } from '../../server/aiHandlers.ts';
+import { runAIStatus } from '../aiHandlers.ts';
 
 export default async function handler(_req: any, res: any) {
   const result = await runAIStatus();

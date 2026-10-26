@@ -1,4 +1,4 @@
-import { runVoice } from '../../server/aiHandlers.ts';
+import { runVoice } from '../aiHandlers.ts';
 
 function parseBody(body: unknown): unknown {
   if (typeof body === 'string') {

@@ -98,6 +98,8 @@ npm start                   # backend :3001 + Vite :5173
 
 Isi `GEMINI_API_KEY` di `.env` agar endpoint `/api/ai/*` aktif. Tanpa kunci, aplikasi tetap berjalan dengan parser lokal dan OCR on-device.
 
+`npm run build` juga menjalankan `npm run build:api`, yang membundel handler di `server/api/` menjadi fungsi Vercel mandiri di `api/ai/*.js`. Bundel hasil build ikut di-commit agar Vercel selalu menemukan fungsinya; jangan edit file di `api/ai/` secara manual.
+
 Perintah tes:
 
 ```bash

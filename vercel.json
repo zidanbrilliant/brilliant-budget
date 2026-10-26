@@ -8,7 +8,7 @@
     }
   ],
   "functions": {
-    "api/ai/*.ts": {
+    "api/ai/*.js": {
       "maxDuration": 60
     }
   },
