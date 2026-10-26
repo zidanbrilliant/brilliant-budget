@@ -1,4 +1,5 @@
 import type { Txn, TxnType, TxnSource, TxnItem, TxnTemplate } from '../types/index.ts';
+import { parseDateAndTime } from './dateParsing.ts';
 
 export const DEFAULT_TEMPLATES: TxnTemplate[] = [
   { id: 'tmpl-1', name: 'Kopi Kenangan', amount: 25000, category_id: 'cat-makan', account_id: 'acc-gopay', merchant: 'Kopi Kenangan' },
@@ -196,9 +197,11 @@ export interface ParsedItem {
   merchant?: string;
   category_id?: string;
   account_id?: string;
+  to_account_id?: string;
   note?: string;
   confidence: number;
   external_ref?: string;
+  occurred_at?: number;
   source: TxnSource;
   raw_source_text: string;
   items?: TxnItem[];
@@ -404,6 +407,14 @@ export function parseOCRText(text: string): ParsedItem {
     }
   }
 
+  // Ekstraksi tanggal/jam transaksi untuk struk dan bukti transfer.
+  const dateMatch =
+    text.match(/\b\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4}\b/) ||
+    text.match(/\b\d{1,2}\s+(?:jan|feb|mar|apr|mei|jun|jul|agu|agt|sep|okt|nov|des)[a-z]*\s+\d{2,4}\b/i) ||
+    text.match(/\b\d{4}-\d{2}-\d{2}\b/);
+  const timeMatch = text.match(/\b\d{1,2}[:.]\d{2}(?::\d{2})?\b(?!\d)/);
+  const occurredAt = dateMatch ? parseDateAndTime(dateMatch[0], timeMatch?.[0]) : undefined;
+
   return {
     type,
     amount,
@@ -413,6 +424,7 @@ export function parseOCRText(text: string): ParsedItem {
     note: `Hasil OCR: ${merchant}`,
     confidence: Math.min(0.98, confidence),
     external_ref: externalRef,
+    occurred_at: occurredAt,
     source: 'ocr',
     raw_source_text: text.slice(0, 160),
     items: items.length > 0 ? items : undefined,

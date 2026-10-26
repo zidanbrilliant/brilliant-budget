@@ -3,10 +3,15 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
   ],
+  "functions": {
+    "api/ai/*.ts": {
+      "maxDuration": 60
+    }
+  },
   "headers": [
     {
       "source": "/sw.js",

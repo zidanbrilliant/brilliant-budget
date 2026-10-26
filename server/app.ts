@@ -6,16 +6,33 @@ import {
   parseOCRText,
   parseQRISCode,
 } from '../src/utils/parser.ts';
+import { runAIStatus, runScanReceipt, runVoice } from './aiHandlers.ts';
 
 initDatabase();
 
 export const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Health & Info
 app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', offline: true, database: 'SQLite (PRD Section 9)' });
+});
+
+// ---------------- GEMINI AI (VOICE & RECEIPT) ----------------
+app.get('/api/ai/status', async (_req: Request, res: Response) => {
+  const result = await runAIStatus();
+  res.status(result.status).json(result.body);
+});
+
+app.post('/api/ai/scan-receipt', async (req: Request, res: Response) => {
+  const result = await runScanReceipt(req.body);
+  res.status(result.status).json(result.body);
+});
+
+app.post('/api/ai/voice', async (req: Request, res: Response) => {
+  const result = await runVoice(req.body);
+  res.status(result.status).json(result.body);
 });
 
 // Helper: Calculate account balances in SQLite (PRD 9 & 10)

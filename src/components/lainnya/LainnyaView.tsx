@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { formatIDR, formatCompactIDR } from '../../utils/formatters';
 import { AppIcon } from '../common/IconHelper';
 import { ReportPieChart } from '../common/ReportPieChart';
+import { GeminiKeyPanel } from '../common/GeminiKeyPanel';
 import { buildReportSummary, type ReportPeriodMode } from '../../utils/reporting';
 import {
   CreditCard,
@@ -60,7 +61,7 @@ export const LainnyaView: React.FC = () => {
     addTransaction,
   } = useApp();
 
-  const [activeSection, setActiveSection] = useState<'menu' | 'dompet' | 'laporan' | 'backup' | 'sms_simulator' | 'kategori' | 'googlesheets'>('menu');
+  const [activeSection, setActiveSection] = useState<'menu' | 'dompet' | 'laporan' | 'backup' | 'sms_simulator' | 'kategori' | 'googlesheets' | 'ai'>('menu');
   const isPinkTheme = settings.theme === 'pink';
 
   useEffect(() => {
@@ -75,6 +76,7 @@ export const LainnyaView: React.FC = () => {
     backup: { title: 'Cadangan & Pemulihan', subtitle: 'Simpan data ke file lokal yang aman' },
     sms_simulator: { title: 'Uji Parser SMS', subtitle: 'Simulasi otomatisasi dari teks SMS bank' },
     googlesheets: { title: 'Google Sheets', subtitle: 'Sinkronkan transaksi secara otomatis' },
+    ai: { title: 'Gemini AI', subtitle: 'Input suara & scan nota dengan AI gratis' },
   };
   const activeMeta = activeSection === 'menu' ? null : sectionMeta[activeSection];
   const primaryBtn = isPinkTheme
@@ -483,6 +485,32 @@ export const LainnyaView: React.FC = () => {
                   <div>
                     <div className="text-xs font-bold text-slate-900 dark:text-white">Uji Parser SMS Shortcuts</div>
                     <div className="text-[11px] text-slate-400">Simulasi Apple Shortcuts App Intent</div>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+              </button>
+            </div>
+          </div>
+
+          {/* Section: AI & Otomatisasi */}
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
+              AI & Otomatisasi
+            </span>
+            <div className="bg-white dark:bg-[#151E2E] rounded-2xl divide-y divide-slate-100 dark:divide-slate-800/80 border border-slate-200/80 dark:border-slate-800/80 shadow-xs overflow-hidden">
+              <button
+                onClick={() => setActiveSection('ai')}
+                className="w-full p-3.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 flex items-center justify-center shrink-0">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-900 dark:text-white">Gemini AI</div>
+                    <div className="text-[11px] text-slate-400">
+                      Input suara & scan nota dengan AI gratis
+                    </div>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
@@ -923,6 +951,9 @@ export const LainnyaView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* ===================== SUB SECTION: GEMINI AI ===================== */}
+      {activeSection === 'ai' && <GeminiKeyPanel />}
 
       {/* ===================== SUB SECTION: BACKUP ===================== */}
       {activeSection === 'backup' && (

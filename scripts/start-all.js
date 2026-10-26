@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 console.log('Memulai Brilliant Budget: Backend SQLite + Frontend Vite...');
 
 // 1. Jalankan Backend Server
-const serverProc = spawn('node', ['server/index.ts'], {
+const serverProc = spawn('node', ['--env-file-if-exists=.env', 'server/index.ts'], {
   stdio: 'inherit',
   shell: true,
 });

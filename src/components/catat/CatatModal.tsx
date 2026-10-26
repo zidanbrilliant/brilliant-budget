@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatIDR, formatCompactIDR } from '../../utils/formatters';
 import { AppIcon } from '../common/IconHelper';
@@ -24,11 +24,32 @@ import {
   Layers,
   Trash2,
   Clipboard,
+  Loader2,
+  Square,
 } from 'lucide-react';
 import { TxnType } from '../../types/index.ts';
 import { pickPhoto, downscaleImage, savePendingUpload } from '../../utils/cameraHelper';
 import { scanQRCodeFromDataUrl } from '../../utils/qrScanner';
 import { recognizeReceiptText } from '../../utils/ocr';
+import { VoiceRecorder, isVoiceRecordingSupported } from '../../utils/audioRecorder';
+import {
+  getAIStatus,
+  getStoredGeminiKey,
+  scanReceiptWithAI,
+  transcribeVoiceWithAI,
+  geminiErrorMessage,
+  type AIStatus,
+} from '../../services/gemini';
+import type { AIContext } from '../../utils/aiSchemas';
+import { formatDateTimeID, todayInJakarta } from '../../utils/dateParsing';
+
+const MAX_RECORDING_SECONDS = 60;
+
+function formatRecordingDuration(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
 
 export const CatatModal: React.FC = () => {
   const {
@@ -45,6 +66,23 @@ export const CatatModal: React.FC = () => {
   } = useApp();
 
   const isPinkTheme = settings.theme === 'pink';
+
+  const aiContext: AIContext = useMemo(
+    () => ({
+      categories: categories.map(category => ({
+        id: category.id,
+        name: category.name,
+        kind: category.kind,
+      })),
+      accounts: accounts.map(account => ({
+        id: account.id,
+        name: account.name,
+        type: account.type,
+      })),
+      today: todayInJakarta(),
+    }),
+    [categories, accounts]
+  );
 
   const [activeTab, setActiveTab] = useState<'manual' | 'voice' | 'ocr' | 'screenshot' | 'qr'>(
     catatInitialMode
@@ -75,12 +113,64 @@ export const CatatModal: React.FC = () => {
   const [ocrEditText, setOcrEditText] = useState('');
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   const [ocrParsedResult, setOcrParsedResult] = useState<ParsedItem | null>(null);
+  const [isOcrProcessing, setIsOcrProcessing] = useState(false);
+  const [ocrError, setOcrError] = useState<string | null>(null);
+  const [ocrEngine, setOcrEngine] = useState<'gemini' | 'tesseract' | 'local' | null>(null);
+
+  // Gemini AI State
+  const [aiStatus, setAiStatus] = useState<AIStatus | null>(null);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voiceEngine, setVoiceEngine] = useState<'gemini' | 'local' | 'speech' | null>(null);
+  const [voiceRecordingSeconds, setVoiceRecordingSeconds] = useState(0);
+  const voiceRecorderRef = useRef<VoiceRecorder | null>(null);
+  const recordingTimerRef = useRef<number | null>(null);
+  const hasAI = Boolean(getStoredGeminiKey()) || Boolean(aiStatus?.available);
 
   // QRIS State
   const [qrisCustomInput, setQrisCustomInput] = useState('');
   const [qrisData, setQrisData] = useState<{ merchant: string; nmid?: string; city?: string; amount?: number } | null>(
     null
   );
+
+  // Cek ketersediaan Gemini saat modal dibuka (server proxy atau kunci perangkat).
+  useEffect(() => {
+    if (!isCatatOpen) return;
+    let mounted = true;
+    getAIStatus()
+      .then(status => {
+        if (mounted) setAiStatus(status);
+      })
+      .catch(() => {
+        if (mounted) setAiStatus(null);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [isCatatOpen]);
+
+  // Hentikan rekaman & timer saat modal ditutup atau komponen dilepas.
+  useEffect(() => {
+    if (isCatatOpen) return;
+    if (recordingTimerRef.current !== null) {
+      window.clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    voiceRecorderRef.current?.cancel();
+    voiceRecorderRef.current = null;
+    setIsRecording(false);
+    setVoiceRecordingSeconds(0);
+  }, [isCatatOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current !== null) {
+        window.clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      voiceRecorderRef.current?.cancel();
+      voiceRecorderRef.current = null;
+    };
+  }, []);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -96,10 +186,14 @@ export const CatatModal: React.FC = () => {
       setAdminFee(0);
       setVoiceParsedItems([]);
       setCustomVoiceInput('');
+      setVoiceError(null);
+      setVoiceEngine(null);
       setOcrSampleText('');
       setOcrEditText('');
       setUploadedImageUrl(null);
       setOcrParsedResult(null);
+      setOcrError(null);
+      setOcrEngine(null);
       setQrisCustomInput('');
       setQrisData(null);
     }
@@ -196,6 +290,8 @@ export const CatatModal: React.FC = () => {
     setCustomVoiceInput(text);
     const parsed = parseVoiceInput(text);
     setVoiceParsedItems(parsed);
+    setVoiceEngine('local');
+    setVoiceError(null);
     if (parsed.length > 0) {
       setTimeout(() => {
         document.getElementById('voice-results')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -233,7 +329,104 @@ export const CatatModal: React.FC = () => {
     }, 200);
   };
 
-  const handleStartVoice = () => {
+  const clearRecordingTimer = () => {
+    if (recordingTimerRef.current !== null) {
+      window.clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  };
+
+  const stopVoiceAndProcess = async () => {
+    const recorder = voiceRecorderRef.current;
+    if (!recorder) return;
+
+    voiceRecorderRef.current = null;
+    clearRecordingTimer();
+    setIsRecording(false);
+    setVoiceError(null);
+    setIsVoiceProcessing(true);
+
+    try {
+      const clip = await recorder.stop();
+      if (clip.durationMs < 700) {
+        setVoiceError('Rekaman terlalu pendek. Tahan mikrofon dan bicara lebih jelas.');
+        showToast('Rekaman terlalu pendek');
+        return;
+      }
+
+      const result = await transcribeVoiceWithAI(clip.base64, clip.mimeType, aiContext);
+      const items = result.items || [];
+      setCustomVoiceInput(result.transcript || '');
+      setVoiceParsedItems(items);
+      setVoiceEngine('gemini');
+      setVoiceError(null);
+
+      if (items.length > 0) {
+        showToast(`${items.length} transaksi terbaca dengan Gemini AI`);
+        setTimeout(() => {
+          document.getElementById('voice-results')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 150);
+      } else {
+        showToast('Suara terbaca, tetapi transaksi belum bisa dipastikan. Lengkapi manual.');
+        document.getElementById('custom-voice-input')?.focus();
+      }
+    } catch (error) {
+      const message = geminiErrorMessage(error);
+      setVoiceError(message);
+      showToast(message);
+      document.getElementById('custom-voice-input')?.focus();
+    } finally {
+      setIsVoiceProcessing(false);
+    }
+  };
+
+  const startRecordingTimer = () => {
+    clearRecordingTimer();
+    setVoiceRecordingSeconds(0);
+    let elapsed = 0;
+    recordingTimerRef.current = window.setInterval(() => {
+      elapsed += 1;
+      setVoiceRecordingSeconds(elapsed);
+      if (elapsed >= MAX_RECORDING_SECONDS) {
+        clearRecordingTimer();
+        void stopVoiceAndProcess();
+      }
+    }, 1000);
+  };
+
+  const handleStartVoice = async () => {
+    if (isVoiceProcessing) return;
+    if (isRecording) {
+      await stopVoiceAndProcess();
+      return;
+    }
+    if (voiceRecorderRef.current) return;
+
+    setVoiceError(null);
+
+    // Jalur utama: rekam audio lalu kirim ke Gemini untuk transkripsi + struktur.
+    if (hasAI && isVoiceRecordingSupported()) {
+      const recorder = new VoiceRecorder();
+      voiceRecorderRef.current = recorder;
+      try {
+        await recorder.start();
+        setIsRecording(true);
+        setVoiceEngine(null);
+        startRecordingTimer();
+        showToast('Mendengarkan... ketuk lagi untuk berhenti');
+      } catch (error) {
+        voiceRecorderRef.current = null;
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Tidak bisa mengakses mikrofon. Periksa izin browser.';
+        setVoiceError(message);
+        showToast(message);
+      }
+      return;
+    }
+
+    // Fallback: Web Speech API bila Gemini belum aktif atau MediaRecorder tidak tersedia.
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
@@ -243,6 +436,7 @@ export const CatatModal: React.FC = () => {
         recognition.lang = 'id-ID';
         recognition.interimResults = false;
         setIsRecording(true);
+        setVoiceEngine('speech');
 
         recognition.onresult = (event: any) => {
           const transcript = event.results[0][0].transcript;
@@ -254,6 +448,7 @@ export const CatatModal: React.FC = () => {
 
         recognition.onerror = () => {
           setIsRecording(false);
+          setVoiceEngine(null);
           const el = document.getElementById('custom-voice-input');
           el?.focus();
           showToast('Gunakan ikon mic 🎤 di keyboard iPhone untuk dikte suara');
@@ -308,8 +503,10 @@ export const CatatModal: React.FC = () => {
         amount: item.amount,
         category_id: item.category_id,
         account_id: item.account_id || selectedAccount,
+        to_account_id: item.to_account_id,
         merchant: item.merchant,
         note: item.note,
+        occurred_at: item.occurred_at,
         source: 'voice',
         confidence: item.confidence,
         status: asDraft ? 'draft' : 'confirmed',
@@ -336,6 +533,40 @@ export const CatatModal: React.FC = () => {
     setOcrEditText(sample);
     const result = parseOCRText(sample);
     setOcrParsedResult(result);
+    setOcrEngine('local');
+    setOcrError(null);
+  };
+
+  const runLocalReceiptScan = async (compressed: string, filename: string) => {
+    let sample = '';
+    let engine: 'tesseract' | 'local' = 'local';
+
+    try {
+      const recognized = await recognizeReceiptText(compressed);
+      if (recognized && recognized.trim().length > 5) {
+        sample = recognized;
+        engine = 'tesseract';
+      }
+    } catch {
+      // Fallback ke contoh teks lokal di bawah.
+    }
+
+    if (!sample) {
+      const lowerName = filename.toLowerCase();
+      if (lowerName.includes('bca') || lowerName.includes('transfer') || lowerName.includes('tf')) {
+        sample = 'TRANSFER BERHASIL\n09 OKT 2026 14:32\nKe: Budi Santoso\nNominal: Rp 750.000\nNo. Ref: 88192301\nm-BCA';
+      } else if (lowerName.includes('gopay') || lowerName.includes('qris')) {
+        sample = 'PEMBAYARAN QRIS BERHASIL\nKopi Kenangan Senayan\nRp 35.000\n09 Okt 2026 10:15\nGoPay Saldo\nID: GP-882391';
+      } else {
+        sample = `STRUK BELANJA\n${filename.replace(/\.[^/.]+$/, '').toUpperCase()}\n09/10/2026 11:20\n1x Belanja Barang Rp 48.000\nTOTAL: Rp 48.000\nREF: STRUK-${Date.now().toString().slice(-6)}`;
+      }
+    }
+
+    setOcrSampleText(sample);
+    setOcrEditText(sample);
+    setOcrParsedResult(parseOCRText(sample));
+    setOcrEngine(engine);
+    return { sample, engine };
   };
 
   const processImagePhoto = async (dataUrlOrFile: string | File) => {
@@ -354,33 +585,80 @@ export const CatatModal: React.FC = () => {
       });
     }
 
-    const compressed = await downscaleImage(dataUrl);
+    // 1600px cukup untuk teks struk kecil, tetap di bawah batas body Vercel.
+    const compressed = await downscaleImage(dataUrl, 1600);
     setUploadedImageUrl(compressed);
+    setOcrSampleText('');
+    setOcrEditText('');
+    setOcrParsedResult(null);
+    setOcrError(null);
+    setOcrEngine(null);
+    setIsOcrProcessing(true);
 
-    let sample = '';
     try {
-      const recognized = await recognizeReceiptText(compressed);
-      if (recognized && recognized.trim().length > 5) {
-        sample = recognized;
+      if (hasAI) {
+        try {
+          const ai = await scanReceiptWithAI(compressed, aiContext);
+          const rawText = ai.result.raw_source_text || '';
+          setOcrSampleText(rawText);
+          setOcrEditText(rawText);
+          setOcrParsedResult(ai.result);
+          setOcrEngine('gemini');
+          showToast(`Nota dibaca Gemini AI (${ai.model})`);
+          return;
+        } catch (error) {
+          const message = geminiErrorMessage(error);
+          setOcrError(message);
+          showToast(`${message} Memakai OCR on-device...`);
+        }
       }
-    } catch {}
 
-    if (!sample) {
-      const lowerName = filename.toLowerCase();
-      if (lowerName.includes('bca') || lowerName.includes('transfer') || lowerName.includes('tf')) {
-        sample = 'TRANSFER BERHASIL\n09 OKT 2026 14:32\nKe: Budi Santoso\nNominal: Rp 750.000\nNo. Ref: 88192301\nm-BCA';
-      } else if (lowerName.includes('gopay') || lowerName.includes('qris')) {
-        sample = 'PEMBAYARAN QRIS BERHASIL\nKopi Kenangan Senayan\nRp 35.000\n09 Okt 2026 10:15\nGoPay Saldo\nID: GP-882391';
-      } else {
-        sample = `STRUK BELANJA\n${filename.replace(/\.[^/.]+$/, '').toUpperCase()}\n09/10/2026 11:20\n1x Belanja Barang Rp 48.000\nTOTAL: Rp 48.000\nREF: STRUK-${Date.now().toString().slice(-6)}`;
-      }
+      const local = await runLocalReceiptScan(compressed, filename);
+      showToast(
+        local.engine === 'tesseract'
+          ? 'Nota dibaca dengan OCR on-device'
+          : 'Foto dimuat dengan contoh teks lokal'
+      );
+    } finally {
+      setIsOcrProcessing(false);
+    }
+  };
+
+  const handleRetryAIScan = async () => {
+    if (!uploadedImageUrl) {
+      showToast('Pilih foto nota terlebih dahulu');
+      return;
     }
 
-    setOcrSampleText(sample);
-    setOcrEditText(sample);
-    const result = parseOCRText(sample);
-    setOcrParsedResult(result);
-    showToast('Foto struk berhasil dimuat');
+    setIsOcrProcessing(true);
+    setOcrError(null);
+    try {
+      const ai = await scanReceiptWithAI(uploadedImageUrl, aiContext);
+      const rawText = ai.result.raw_source_text || '';
+      setOcrSampleText(rawText);
+      setOcrEditText(rawText);
+      setOcrParsedResult(ai.result);
+      setOcrEngine('gemini');
+      showToast(`Nota dibaca Gemini AI (${ai.model})`);
+    } catch (error) {
+      const message = geminiErrorMessage(error);
+      setOcrError(message);
+      showToast(message);
+    } finally {
+      setIsOcrProcessing(false);
+    }
+  };
+
+  const handleReparseLocal = () => {
+    const text = (ocrEditText || ocrSampleText).trim();
+    if (!text) {
+      showToast('Belum ada teks nota untuk diproses');
+      return;
+    }
+    setOcrParsedResult(parseOCRText(text));
+    setOcrEngine('local');
+    setOcrError(null);
+    showToast('Nota diproses ulang dengan parser lokal');
   };
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -437,6 +715,7 @@ export const CatatModal: React.FC = () => {
     setOcrEditText(text);
     const result = parseOCRText(text);
     setOcrParsedResult(result);
+    setOcrEngine('local');
   };
 
   const handleSaveOCR = (asDraft = false) => {
@@ -446,9 +725,11 @@ export const CatatModal: React.FC = () => {
       amount: ocrParsedResult.amount,
       category_id: ocrParsedResult.category_id,
       account_id: ocrParsedResult.account_id,
+      to_account_id: ocrParsedResult.to_account_id,
       merchant: ocrParsedResult.merchant,
       external_ref: ocrParsedResult.external_ref,
       note: ocrParsedResult.note,
+      occurred_at: ocrParsedResult.occurred_at,
       source: 'ocr',
       confidence: ocrParsedResult.confidence,
       status: asDraft ? 'draft' : 'confirmed',
@@ -470,6 +751,7 @@ export const CatatModal: React.FC = () => {
           merchant: ocrParsedResult.merchant,
           external_ref: ocrParsedResult.external_ref,
           note: `${item.name} (${ocrParsedResult.merchant})`,
+          occurred_at: ocrParsedResult.occurred_at,
           source: 'ocr',
           confidence: ocrParsedResult.confidence,
           status: asDraft ? 'draft' : 'confirmed',
@@ -838,25 +1120,85 @@ export const CatatModal: React.FC = () => {
           {activeTab === 'voice' && (
             <div className="space-y-4 text-center py-2">
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Ucapkan transaksi dalam Bahasa Indonesia. Sistem on-device memproses secara instan.
+                {hasAI
+                  ? 'Rekam ucapan dalam Bahasa Indonesia. Gemini AI mengubahnya menjadi transaksi terstruktur.'
+                  : 'Ucapkan transaksi dalam Bahasa Indonesia. Parser on-device memproses secara instan.'}
               </p>
+
+              <div className="flex items-center justify-center">
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                    hasAI
+                      ? 'bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-950/60 dark:text-fuchsia-300'
+                      : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  {hasAI ? 'Gemini AI aktif' : 'Parser lokal on-device'}
+                </span>
+              </div>
 
               {/* Mic Button */}
               <div className="py-2">
                 <button
-                  onClick={handleStartVoice}
+                  type="button"
+                  onClick={() => {
+                    void handleStartVoice();
+                  }}
+                  disabled={isVoiceProcessing}
+                  aria-label={isRecording ? 'Berhenti merekam dan proses' : 'Mulai rekam suara'}
                   className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center transition shadow-md ${
                     isRecording
                       ? 'bg-rose-500 text-white animate-pulse ring-4 ring-rose-500/20'
-                      : 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95 ring-4 ring-emerald-500/10'
+                      : isVoiceProcessing
+                        ? 'bg-slate-400 dark:bg-slate-600 text-white cursor-wait'
+                        : 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95 ring-4 ring-emerald-500/10'
                   }`}
                 >
-                  <Mic className="w-7 h-7" />
+                  {isVoiceProcessing ? (
+                    <Loader2 className="w-7 h-7 animate-spin" />
+                  ) : isRecording ? (
+                    <Square className="w-6 h-6 fill-current" />
+                  ) : (
+                    <Mic className="w-7 h-7" />
+                  )}
                 </button>
                 <div className="mt-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  {isRecording ? 'Mendengarkan...' : 'Ketuk untuk Bicara'}
+                  {isVoiceProcessing
+                    ? 'Memproses dengan Gemini AI...'
+                    : isRecording
+                      ? `Mendengarkan... ${formatRecordingDuration(voiceRecordingSeconds)}`
+                      : 'Ketuk untuk Bicara'}
+                </div>
+                <div className="mt-1 text-[10px] text-slate-400">
+                  {isVoiceProcessing
+                    ? 'Mengubah suara menjadi transaksi terstruktur'
+                    : isRecording
+                      ? `Ketuk lagi untuk berhenti (maks. ${MAX_RECORDING_SECONDS} detik)`
+                      : hasAI
+                        ? 'Rekaman diproses Gemini AI, tidak disimpan di server'
+                        : 'Tanpa internet · gunakan mic keyboard untuk dikte'}
                 </div>
               </div>
+
+              {voiceError && (
+                <div className="text-left p-2.5 rounded-xl border border-amber-200/70 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-[11px] leading-relaxed flex items-start gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p>{voiceError}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVoiceError(null);
+                        document.getElementById('custom-voice-input')?.focus();
+                      }}
+                      className="mt-1 font-bold underline underline-offset-2"
+                    >
+                      Dikte manual lewat keyboard
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Quick Preset Buttons */}
               <div className="text-left space-y-1.5">
@@ -946,9 +1288,24 @@ export const CatatModal: React.FC = () => {
               {/* Parsed Results */}
               {voiceParsedItems.length > 0 && (
                 <div id="voice-results" className="space-y-2 pt-2 text-left">
-                  <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-slate-200">
+                  <div className="flex items-center justify-between gap-2 text-xs font-bold text-slate-700 dark:text-slate-200">
                     <span>Hasil Ekstraksi ({voiceParsedItems.length} Transaksi)</span>
-                    <span className="text-emerald-600 text-[11px]">Bisa diedit</span>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
+                          voiceEngine === 'gemini'
+                            ? 'bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-950/60 dark:text-fuchsia-300'
+                            : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                        }`}
+                      >
+                        {voiceEngine === 'gemini'
+                          ? 'Gemini AI'
+                          : voiceEngine === 'speech'
+                            ? 'Dikte Browser'
+                            : 'Parser Lokal'}
+                      </span>
+                      <span className="text-emerald-600 text-[11px]">Bisa diedit</span>
+                    </div>
                   </div>
 
                   {voiceParsedItems.map((item, idx) => {
@@ -1011,6 +1368,12 @@ export const CatatModal: React.FC = () => {
                             “{item.note}”
                           </p>
                         )}
+
+                        {item.occurred_at && (
+                          <p className="text-[10px] text-slate-400">
+                            Tanggal: {formatDateTimeID(item.occurred_at)}
+                          </p>
+                        )}
                       </div>
                     );
                   })}
@@ -1038,8 +1401,23 @@ export const CatatModal: React.FC = () => {
           {(activeTab === 'ocr' || activeTab === 'screenshot') && (
             <div className="space-y-3.5">
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Pindai struk belanja atau bukti transfer bank/e-wallet via OCR on-device.
+                {hasAI
+                  ? 'Foto struk atau bukti transfer. Gemini AI membaca total, merchant, tanggal, dan rincian item.'
+                  : 'Pindai struk belanja atau bukti transfer bank/e-wallet via OCR on-device.'}
               </p>
+
+              <div className="flex items-center justify-center">
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                    hasAI
+                      ? 'bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-950/60 dark:text-fuchsia-300'
+                      : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  {hasAI ? 'Gemini Vision aktif' : 'OCR lokal on-device'}
+                </span>
+              </div>
 
               {/* Sample Document Selectors */}
               <div className="space-y-1.5">
@@ -1147,11 +1525,60 @@ export const CatatModal: React.FC = () => {
                 </div>
               )}
 
+              {isOcrProcessing && (
+                <div className="p-3 rounded-2xl border border-fuchsia-200/70 dark:border-fuchsia-900/60 bg-fuchsia-50/70 dark:bg-fuchsia-950/30 flex items-center gap-3 text-left">
+                  <Loader2 className="w-5 h-5 animate-spin text-fuchsia-500 shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                      {hasAI ? 'Membaca nota dengan Gemini AI...' : 'Membaca nota dengan OCR on-device...'}
+                    </p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                      Biasanya 3–8 detik. Hasil tetap bisa diedit sebelum disimpan.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {ocrError && !isOcrProcessing && (
+                <div className="p-2.5 rounded-xl border border-amber-200/70 dark:border-amber-900/60 bg-amber-50 dark:bg-amber-950/40 text-left">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300">
+                        Gemini AI belum berhasil
+                      </p>
+                      <p className="text-[10px] leading-relaxed text-amber-700/90 dark:text-amber-300/90 mt-0.5">
+                        {ocrError}
+                      </p>
+                      <div className="flex flex-wrap gap-2 mt-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleRetryAIScan();
+                          }}
+                          disabled={!uploadedImageUrl}
+                          className="px-2.5 py-1.5 rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-[10px] font-bold active:scale-95 transition disabled:opacity-50"
+                        >
+                          Coba AI Lagi
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleReparseLocal}
+                          className="px-2.5 py-1.5 rounded-lg bg-white/80 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-amber-200/70 dark:border-amber-900/60 text-[10px] font-bold active:scale-95 transition"
+                        >
+                          Parser Lokal
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Editable OCR text area (FR-10: Layar konfirmasi dengan bidang yang dapat diedit) */}
               {ocrEditText && (
                 <div className="text-left space-y-1">
                   <span className="text-[10px] font-bold text-slate-400 uppercase">
-                    Koreksi Teks Nota (On-Device OCR):
+                    Koreksi Teks Nota ({ocrEngine === 'gemini' ? 'Gemini AI' : 'On-Device OCR'}):
                   </span>
                   <textarea
                     value={ocrEditText}
@@ -1166,9 +1593,22 @@ export const CatatModal: React.FC = () => {
               {/* OCR Result Card (Structured Paper Style) */}
               {ocrParsedResult && (
                 <div className="bg-slate-50 dark:bg-slate-800/80 rounded-2xl p-3.5 border border-slate-200 dark:border-slate-700 space-y-2.5 text-xs">
-                  <div className="flex items-center justify-between border-b pb-2 border-slate-200/80 dark:border-slate-700">
-                    <span className="font-bold text-slate-600 dark:text-slate-300">Hasil Parser Dokumen</span>
-                    <span className="font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/80 px-2 py-0.5 rounded-md text-[10px]">
+                  <div className="flex items-center justify-between gap-2 border-b pb-2 border-slate-200/80 dark:border-slate-700">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-bold text-slate-600 dark:text-slate-300">Hasil Parser Dokumen</span>
+                      {ocrEngine && (
+                        <span
+                          className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${
+                            ocrEngine === 'gemini'
+                              ? 'bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-950/60 dark:text-fuchsia-300'
+                              : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          {ocrEngine === 'gemini' ? 'Gemini AI' : 'OCR Lokal'}
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/80 px-2 py-0.5 rounded-md text-[10px] shrink-0">
                       Akurasi: {Math.round(ocrParsedResult.confidence * 100)}%
                     </span>
                   </div>
@@ -1186,6 +1626,23 @@ export const CatatModal: React.FC = () => {
                         {formatIDR(ocrParsedResult.amount)}
                       </span>
                     </div>
+                    {ocrParsedResult.occurred_at && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Tanggal:</span>
+                        <span className="font-medium text-slate-700 dark:text-slate-300">
+                          {formatDateTimeID(ocrParsedResult.occurred_at)}
+                        </span>
+                      </div>
+                    )}
+                    {ocrParsedResult.to_account_id && (
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Dompet Tujuan:</span>
+                        <span className="font-medium text-slate-700 dark:text-slate-300">
+                          {accounts.find(account => account.id === ocrParsedResult.to_account_id)?.name ||
+                            ocrParsedResult.to_account_id}
+                        </span>
+                      </div>
+                    )}
                     {ocrParsedResult.external_ref && (
                       <div className="flex justify-between">
                         <span className="text-slate-500">No. Referensi:</span>

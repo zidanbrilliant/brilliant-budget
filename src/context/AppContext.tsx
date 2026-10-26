@@ -369,6 +369,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       confidence: data.confidence ?? 1.0,
       admin_fee: data.admin_fee,
       raw_source_text: data.raw_source_text,
+      items: data.items,
       created_at: Date.now(),
       updated_at: Date.now(),
     };
