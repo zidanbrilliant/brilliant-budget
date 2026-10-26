@@ -59,6 +59,7 @@ export const LainnyaView: React.FC = () => {
     resetAllData,
     showToast,
     addTransaction,
+    syncFromSheet,
   } = useApp();
 
   const [activeSection, setActiveSection] = useState<'menu' | 'dompet' | 'laporan' | 'backup' | 'sms_simulator' | 'kategori' | 'googlesheets' | 'ai'>('menu');
@@ -107,6 +108,7 @@ export const LainnyaView: React.FC = () => {
   const [sheetUrl, setSheetUrl] = useState(getSheetWebhookUrl());
   const [queueCount, setQueueCount] = useState(getQueue().length);
   const [isTestingSheet, setIsTestingSheet] = useState(false);
+  const [isPulling, setIsPulling] = useState(false);
   const [isCopiedCode, setIsCopiedCode] = useState(false);
 
   // Custom Category Modal (FR-35)
@@ -1048,16 +1050,34 @@ export const LainnyaView: React.FC = () => {
               />
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => {
                   setSheetWebhookUrl(sheetUrl);
                   showToast('URL Google Sheets disimpan');
                 }}
-                className={`flex-1 py-2.5 rounded-xl font-bold transition active:scale-95 ${primaryBtn}`}
+                className={`flex-1 min-w-[120px] py-2.5 rounded-xl font-bold transition active:scale-95 ${primaryBtn}`}
               >
                 Simpan URL
+              </button>
+              <button
+                type="button"
+                disabled={!sheetUrl || isPulling}
+                onClick={async () => {
+                  if (!sheetUrl) return;
+                  setIsPulling(true);
+                  await syncFromSheet(false);
+                  setIsPulling(false);
+                }}
+                className={`px-3 py-2.5 rounded-xl font-bold flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50 ${
+                  isPinkTheme
+                    ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
+                    : 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200'
+                }`}
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isPulling ? 'animate-spin' : ''}`} />
+                <span>{isPulling ? 'Menarik...' : 'Tarik Data'}</span>
               </button>
               <button
                 type="button"
@@ -1081,10 +1101,21 @@ export const LainnyaView: React.FC = () => {
                     showToast('Gagal kirim, periksa izin deployment Web App');
                   }
                 }}
-                className={`px-3.5 py-2.5 rounded-xl font-bold transition active:scale-95 disabled:opacity-50 ${secondaryBtn}`}
+                className={`px-3 py-2.5 rounded-xl font-bold transition active:scale-95 disabled:opacity-50 ${secondaryBtn}`}
               >
                 {isTestingSheet ? 'Mengirim...' : 'Tes Kirim'}
               </button>
+            </div>
+
+            {/* Auto-Sync Real-time Info */}
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/60 space-y-1">
+              <div className="flex items-center gap-1.5 font-bold text-slate-800 dark:text-slate-200">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Sinkronisasi 2 Arah Otomatis Aktif</span>
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                Data ditarik otomatis tiap aplikasi dibuka, pindah tab, dan berkala tiap 30 detik. Pasang URL Webhook yang sama di laptop dan HP agar transaksi tersinkron di kedua perangkat.
+              </p>
             </div>
 
             {/* Offline Queue info */}

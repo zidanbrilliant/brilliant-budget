@@ -42,25 +42,87 @@ Dengan cara ini kunci tetap di server. Browser hanya memanggil `/api/ai/*`, dan 
 
 ---
 
-## 3. Setup Auto-Sync Google Sheets (1 Menit)
+## 3. Setup Auto-Sync Google Sheets (Sinkronisasi 2 Arah Laptop & HP)
 1. Buat Spreadsheet baru di Google Drive Anda.
 2. Buka menu **Extensions (Ekstensi) > Apps Script**.
-3. Hapus kode bawaan dan tempel kode berikut:
+3. Hapus kode bawaan dan tempel kode berikut (mendukung simpan dan tarik data real-time):
    ```javascript
+   function doGet(e) {
+     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+     var values = sheet.getDataRange().getValues();
+     if (!values || values.length <= 1) {
+       return ContentService.createTextOutput(JSON.stringify({ status: 'ok', data: [] }))
+         .setMimeType(ContentService.MimeType.JSON);
+     }
+     var header = values[0].map(function(h) { return String(h || '').trim().toLowerCase(); });
+     var hasId = header[0] === 'id';
+     var tz = Session.getScriptTimeZone() || 'Asia/Jakarta';
+     var rows = [];
+
+     function formatCell(val) {
+       if (val instanceof Date) {
+         return Utilities.formatDate(val, tz, 'yyyy-MM-dd HH:mm:ss');
+       }
+       return val === null || val === undefined ? '' : String(val);
+     }
+
+     for (var i = 1; i < values.length; i++) {
+       var r = values[i];
+       if (!r || r.length === 0) continue;
+       var rawDate = formatCell(r[hasId ? 1 : 0]).trim();
+       if (!rawDate) continue;
+
+       rows.push({
+         id: hasId ? formatCell(r[0]).trim() : '',
+         date: rawDate,
+         type: formatCell(r[hasId ? 2 : 1]).trim().toLowerCase() || 'expense',
+         category: formatCell(r[hasId ? 3 : 2]).trim(),
+         amount: Number(r[hasId ? 4 : 3]) || 0,
+         account: formatCell(r[hasId ? 5 : 4]).trim(),
+         note: formatCell(r[hasId ? 6 : 5]).trim(),
+         source: formatCell(r[hasId ? 7 : 6]).trim() || 'sheet'
+       });
+     }
+
+     return ContentService.createTextOutput(JSON.stringify({ status: 'ok', data: rows }))
+       .setMimeType(ContentService.MimeType.JSON);
+   }
+
    function doPost(e) {
      var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
      if (sheet.getLastRow() === 0) {
-       sheet.appendRow(["Tanggal", "Tipe", "Kategori", "Nominal", "Dompet", "Catatan", "Sumber"]);
+       sheet.appendRow(["ID", "Tanggal", "Tipe", "Kategori", "Nominal", "Dompet", "Catatan", "Sumber"]);
      }
      var data = JSON.parse(e.postData.contents);
-     if (Array.isArray(data)) {
-       data.forEach(function(r) {
-         sheet.appendRow([r.date, r.type, r.category, r.amount, r.account, r.note, r.source]);
-       });
-     } else {
-       sheet.appendRow([data.date, data.type, data.category, data.amount, data.account, data.note, data.source]);
+     var items = Array.isArray(data) ? data : [data];
+     var values = sheet.getDataRange().getValues();
+     var header = (values[0] || []).map(function(h) { return String(h || '').trim().toLowerCase(); });
+     var hasId = header[0] === 'id';
+
+     var idRowMap = {};
+     if (hasId && values.length > 1) {
+       for (var i = 1; i < values.length; i++) {
+         var existingId = String(values[i][0] || '').trim();
+         if (existingId) idRowMap[existingId] = i + 1;
+       }
      }
-     return ContentService.createTextOutput("OK").setMimeType(ContentService.MimeType.TEXT);
+
+     items.forEach(function(r) {
+       var id = String(r.id || '').trim();
+       var rowData = hasId
+         ? [id, r.date, r.type, r.category, r.amount, r.account, r.note, r.source]
+         : [r.date, r.type, r.category, r.amount, r.account, r.note, r.source];
+
+       if (hasId && id && idRowMap[id]) {
+         sheet.getRange(idRowMap[id], 1, 1, rowData.length).setValues([rowData]);
+       } else {
+         sheet.appendRow(rowData);
+         if (hasId && id) idRowMap[id] = sheet.getLastRow();
+       }
+     });
+
+     return ContentService.createTextOutput(JSON.stringify({ status: 'ok', count: items.length }))
+       .setMimeType(ContentService.MimeType.JSON);
    }
    ```
 4. Klik **Save (Ikon Disket)**.
@@ -68,7 +130,10 @@ Dengan cara ini kunci tetap di server. Browser hanya memanggil `/api/ai/*`, dan 
    - **Execute as**: *Me (email Anda)*
    - **Who has access**: *Anyone (Siapa saja)*
 6. Klik **Deploy**, lalu salin **Web app URL**.
-7. Buka Brilliant Budget di browser, masuk ke menu **Lainnya > Auto-Sync Google Sheets**, tempel URL tersebut lalu klik **Simpan URL**.
+7. Buka Brilliant Budget di **Laptop** dan di **HP**:
+   - Masuk ke menu **Lainnya > Auto-Sync Google Sheets**.
+   - Tempel **Web app URL yang sama** di kedua perangkat, lalu klik **Simpan URL**.
+   - Selesai! Data transaksi akan otomatis tersinkron antara Laptop dan HP saat aplikasi dibuka, saat beralih tab, dan setiap 30 detik. Anda juga dapat menekan tombol **Tarik Data** kapan saja.
 
 ---
 

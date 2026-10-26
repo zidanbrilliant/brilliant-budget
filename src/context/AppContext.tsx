@@ -25,7 +25,14 @@ import {
 } from '../utils/budgetLogic.ts';
 import { cascadeDeleteAccount } from '../utils/accountDeletion.ts';
 import { processDueRecurringRules } from '../services/recurringScheduler';
-import { syncTransactionToSheet, flushSheetQueue } from '../services/googleSheets';
+import {
+  syncTransactionToSheet,
+  flushSheetQueue,
+  pullTransactionsFromSheet,
+  mergeSheetRows,
+  getSheetWebhookUrl,
+  setLastPullTime,
+} from '../services/googleSheets';
 
 const STORAGE_KEY = 'CATAT_APP_STATE_V4';
 
@@ -53,6 +60,7 @@ interface AppContextType {
   showToast: (message: string, undo?: () => void) => void;
   clearToast: () => void;
   isBackendConnected: boolean;
+  syncFromSheet: (silent?: boolean) => Promise<number>;
 
   // Calculators
   getAccountBalance: (accountId: string) => number;
@@ -205,17 +213,98 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // Flush pending Google Sheets sync queue when online
+  // Seamless 2-way Google Sheets sync
+  const isSyncingFromSheet = React.useRef(false);
+  const lastSheetSyncAt = React.useRef(0);
+
+  const syncFromSheet = async (silent = true): Promise<number> => {
+    const url = getSheetWebhookUrl();
+    if (!url || !navigator.onLine || isSyncingFromSheet.current) return 0;
+
+    const now = Date.now();
+    if (now - lastSheetSyncAt.current < 4000) return 0;
+
+    isSyncingFromSheet.current = true;
+    lastSheetSyncAt.current = now;
+
+    try {
+      const rows = await pullTransactionsFromSheet(url);
+      if (!rows || rows.length === 0) return 0;
+
+      let added = 0;
+      let updated = 0;
+
+      setTransactions(prev => {
+        const res = mergeSheetRows(prev, rows, categories, accounts);
+        added = res.addedCount;
+        updated = res.updatedCount;
+        if (added > 0 || updated > 0) {
+          if (isBackendConnected) {
+            for (const t of res.merged) {
+              if (!prev.some(p => p.id === t.id)) {
+                api.createTransaction(t).catch(console.error);
+              }
+            }
+          }
+          return res.merged;
+        }
+        return prev;
+      });
+
+      setLastPullTime(Date.now());
+
+      if (!silent) {
+        if (added + updated > 0) {
+          showToast(`${added} transaksi baru ditarik dari Google Sheets`);
+        } else {
+          showToast('Data sudah yang terbaru');
+        }
+      }
+
+      return added + updated;
+    } catch (err) {
+      console.warn('Sync from sheet error:', err);
+      if (!silent) showToast('Gagal menarik data dari Google Sheets');
+      return 0;
+    } finally {
+      isSyncingFromSheet.current = false;
+    }
+  };
+
+  // Seamless Auto-Sync Google Sheets in background
   useEffect(() => {
+    syncFromSheet(true).catch(console.error);
+
     const handleOnline = () => {
       flushSheetQueue().then(count => {
         if (count > 0) showToast(`${count} transaksi disinkron ke Google Sheets`);
       }).catch(console.error);
+      syncFromSheet(true).catch(console.error);
     };
     window.addEventListener('online', handleOnline);
     if (navigator.onLine) handleOnline();
-    return () => window.removeEventListener('online', handleOnline);
-  }, []);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        syncFromSheet(true).catch(console.error);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleVisibility);
+
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        syncFromSheet(true).catch(console.error);
+      }
+    }, 30000);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
+      clearInterval(timer);
+    };
+  }, [categories, accounts]);
 
   // Sync to localStorage as offline mirror
   useEffect(() => {
@@ -388,6 +477,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const accName = accounts.find(a => a.id === newTxn.account_id)?.name || 'Dompet';
       const dateStr = new Date(newTxn.occurred_at).toLocaleString('sv-SE');
       syncTransactionToSheet({
+        id: newTxn.id,
         date: dateStr,
         type: newTxn.type,
         category: catName,
@@ -411,6 +501,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (isBackendConnected) {
       api.updateTransaction(id, updates).catch(console.error);
+    }
+
+    const updatedTxn = { ...prevTxn, ...updates };
+    if (updatedTxn.status === 'confirmed') {
+      const catName = categories.find(c => c.id === updatedTxn.category_id)?.name || 'Lainnya';
+      const accName = accounts.find(a => a.id === updatedTxn.account_id)?.name || 'Dompet';
+      const dateStr = new Date(updatedTxn.occurred_at).toLocaleString('sv-SE');
+      syncTransactionToSheet({
+        id: updatedTxn.id,
+        date: dateStr,
+        type: updatedTxn.type,
+        category: catName,
+        amount: updatedTxn.amount,
+        account: accName,
+        note: updatedTxn.merchant ? `${updatedTxn.merchant} ${updatedTxn.note ? `(${updatedTxn.note})` : ''}`.trim() : (updatedTxn.note || '-'),
+        source: updatedTxn.source,
+      }).catch(console.error);
     }
 
     showToast('Perubahan disimpan', () => {
@@ -447,6 +554,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const accName = accounts.find(a => a.id === target.account_id)?.name || 'Dompet';
       const dateStr = new Date(target.occurred_at).toLocaleString('sv-SE');
       syncTransactionToSheet({
+        id: target.id,
         date: dateStr,
         type: target.type,
         category: catName,
@@ -473,6 +581,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const accName = accounts.find(a => a.id === d.account_id)?.name || 'Dompet';
       const dateStr = new Date(d.occurred_at).toLocaleString('sv-SE');
       syncTransactionToSheet({
+        id: d.id,
         date: dateStr,
         type: d.type,
         category: catName,
@@ -843,6 +952,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         showToast,
         clearToast,
         isBackendConnected,
+        syncFromSheet,
         getAccountBalance,
         getTotalNetWorth,
         getMonthSummary,
