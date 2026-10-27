@@ -27,6 +27,9 @@ import {
   Check,
   Copy,
   RefreshCw,
+  CloudDownload,
+  CloudUpload,
+  Loader2,
 } from 'lucide-react';
 import { parseOCRText } from '../../utils/parser';
 import { Account, AccountType, Category } from '../../types/index.ts';
@@ -62,6 +65,10 @@ export const LainnyaView: React.FC = () => {
     showToast,
     addTransaction,
     syncFromSheet,
+    configSyncEnabled,
+    setConfigSyncEnabled,
+    saveConfigToSheet,
+    restoreConfigFromSheet,
   } = useApp();
 
   const [activeSection, setActiveSection] = useState<'menu' | 'dompet' | 'laporan' | 'backup' | 'sms_simulator' | 'kategori' | 'googlesheets' | 'ai'>('menu');
@@ -78,7 +85,7 @@ export const LainnyaView: React.FC = () => {
     laporan: { title: 'Laporan & Wawasan', subtitle: 'Ringkasan dan analisis keuanganmu' },
     backup: { title: 'Cadangan & Pemulihan', subtitle: 'Simpan data ke file lokal yang aman' },
     sms_simulator: { title: 'Uji Parser SMS', subtitle: 'Simulasi otomatisasi dari teks SMS bank' },
-    googlesheets: { title: 'Google Sheets', subtitle: 'Sinkronkan transaksi secara otomatis' },
+    googlesheets: { title: 'Google Sheets', subtitle: 'Sinkronkan transaksi & konfigurasi' },
     ai: { title: 'Gemini AI', subtitle: 'Input suara & scan nota dengan AI gratis' },
   };
   const activeMeta = activeSection === 'menu' ? null : sectionMeta[activeSection];
@@ -112,6 +119,9 @@ export const LainnyaView: React.FC = () => {
   const [isTestingSheet, setIsTestingSheet] = useState(false);
   const [isPulling, setIsPulling] = useState(false);
   const [isCopiedCode, setIsCopiedCode] = useState(false);
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+  const [isRestoringConfig, setIsRestoringConfig] = useState(false);
+  const [configStatus, setConfigStatus] = useState<{ ok: boolean; text: string } | null>(null);
 
   // Custom Category Modal (FR-35)
   const [isAddCatOpen, setIsAddCatOpen] = useState(false);
@@ -255,6 +265,50 @@ export const LainnyaView: React.FC = () => {
       }
     };
     reader.readAsText(file);
+  };
+
+  const handleSaveConfig = async () => {
+    if (!sheetUrl.trim()) {
+      showToast('Isi URL Webhook Google Sheets dulu');
+      return;
+    }
+    setSheetWebhookUrl(sheetUrl);
+    setIsSavingConfig(true);
+    const result = await saveConfigToSheet();
+    setIsSavingConfig(false);
+    setConfigStatus({ ok: result.ok, text: result.message });
+    showToast(result.message);
+  };
+
+  const handleRestoreConfig = async () => {
+    if (!sheetUrl.trim()) {
+      showToast('Isi URL Webhook Google Sheets dulu');
+      return;
+    }
+    setSheetWebhookUrl(sheetUrl);
+    setIsRestoringConfig(true);
+    const result = await restoreConfigFromSheet();
+    setIsRestoringConfig(false);
+    setConfigStatus({ ok: result.ok, text: result.message });
+    showToast(result.message);
+  };
+
+  const handleToggleConfigSync = (enabled: boolean) => {
+    if (!enabled) {
+      setConfigSyncEnabled(false);
+      setConfigStatus({ ok: true, text: 'Sinkron konfigurasi otomatis dimatikan.' });
+      return;
+    }
+    if (!sheetUrl.trim()) {
+      showToast('Isi URL Webhook Google Sheets dulu');
+      return;
+    }
+    setSheetWebhookUrl(sheetUrl);
+    setConfigSyncEnabled(true);
+    setConfigStatus({
+      ok: true,
+      text: 'Sinkron otomatis aktif. Di perangkat baru, klik Pulihkan Config dulu sebelum mengubah data agar config lama tidak tertimpa.',
+    });
   };
 
   const handleExecuteTransfer = () => {
@@ -1172,6 +1226,94 @@ export const LainnyaView: React.FC = () => {
             </div>
           </div>
 
+          {/* Config Sheet: dompet, kategori, budget, target, setelan */}
+          <div className="bg-white dark:bg-[#151E2E] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-3 text-xs">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h4 className="font-bold text-slate-900 dark:text-white text-sm">
+                  Cadangan Konfigurasi
+                </h4>
+                <p className="text-slate-400 mt-1 leading-relaxed">
+                  Simpan dompet, kategori, budget, langganan, target, dan setelan ke sheet{' '}
+                  <b>Config</b>. Setelah aplikasi dihapus atau dipasang ulang, konfigurasi bisa
+                  dipulihkan tanpa menyusun ulang dari nol.
+                </p>
+              </div>
+              <span
+                className={`shrink-0 px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                  configSyncEnabled
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300'
+                    : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                }`}
+              >
+                {configSyncEnabled ? 'Aktif' : 'Nonaktif'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={!sheetUrl.trim() || isSavingConfig}
+                onClick={handleSaveConfig}
+                className={`py-2.5 rounded-xl font-bold flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50 ${primaryBtn}`}
+              >
+                {isSavingConfig ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <CloudUpload className="w-3.5 h-3.5" />
+                )}
+                <span>{isSavingConfig ? 'Menyimpan...' : 'Simpan Config'}</span>
+              </button>
+              <button
+                type="button"
+                disabled={!sheetUrl.trim() || isRestoringConfig}
+                onClick={handleRestoreConfig}
+                className={`py-2.5 rounded-xl font-bold flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50 ${secondaryBtn}`}
+              >
+                {isRestoringConfig ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <CloudDownload className="w-3.5 h-3.5" />
+                )}
+                <span>{isRestoringConfig ? 'Memulihkan...' : 'Pulihkan Config'}</span>
+              </button>
+            </div>
+
+            <label className="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/60 cursor-pointer">
+              <div>
+                <div className="font-bold text-slate-700 dark:text-slate-200">
+                  Sinkron otomatis
+                </div>
+                <div className="text-[10px] text-slate-400 leading-relaxed">
+                  Kirim perubahan konfigurasi ke sheet Config setelah disimpan.
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={configSyncEnabled}
+                onChange={e => handleToggleConfigSync(e.target.checked)}
+                className="w-4 h-4 accent-emerald-600 shrink-0"
+              />
+            </label>
+
+            {configStatus && (
+              <p
+                className={`text-[11px] leading-relaxed rounded-xl px-3 py-2 ${
+                  configStatus.ok
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                    : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                }`}
+              >
+                {configStatus.text}
+              </p>
+            )}
+
+            <p className="text-[10px] text-slate-400 leading-relaxed">
+              Fitur ini membutuhkan skrip v2 (sheet Config). Jika muncul pesan skrip lama, salin
+              ulang kode di panduan bawah lalu <b>Deploy ulang</b>.
+            </p>
+          </div>
+
           {/* Setup Guide Card */}
           <div className="bg-white dark:bg-[#151E2E] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-3 text-xs">
             <div className="flex items-center justify-between">
@@ -1201,6 +1343,12 @@ export const LainnyaView: React.FC = () => {
               <li>Atur <i>Who has access (Akses)</i> menjadi <b>Anyone (Siapa saja)</b>, lalu klik <b>Deploy</b>.</li>
               <li>Salin <b>Web app URL</b> yang muncul dan tempel ke kolom di atas. Selesai!</li>
             </ol>
+
+            <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-relaxed rounded-xl bg-amber-50 dark:bg-amber-950/50 px-3 py-2">
+              Sudah pernah memasang skrip versi lama? Salin ulang kode di atas, timpa isi Apps
+              Script, lalu <b>Deploy &gt; Manage deployments &gt; Edit &gt; New version &gt; Deploy</b>.
+              Tanpa langkah ini, tombol Simpan/Pulihkan Config akan menolak karena skrip masih v1.
+            </p>
           </div>
         </div>
       )}

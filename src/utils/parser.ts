@@ -207,9 +207,77 @@ export interface ParsedItem {
   items?: TxnItem[];
 }
 
-// Deteksi kategori otomatis berdasarkan kata kunci (FR-36, 8.4)
-export function guessCategory(text: string): string {
+// Deteksi tipe transaksi dari kata kerja/kata benda yang paling awal muncul.
+// "bayar gaji karyawan" tetap pengeluaran karena "bayar" disebut lebih dulu,
+// sedangkan "dapat gaji kantor" adalah pemasukan karena "dapat" disebut lebih dulu.
+type TxnTypeMarker = { type: TxnType; regex: RegExp };
+
+const OWN_WALLET = 'gopay|bca|shopee(?:pay)?|ovo|dana|linkaja|tunai|cash';
+
+const TXN_TYPE_MARKERS: TxnTypeMarker[] = [
+  // Frasa pemasukan (lebih spesifik daripada kata tunggal "kirim"/"transfer").
+  { type: 'income', regex: /\b(?:terima|menerima|dapat|dapet|mendapat)\s+(?:transfer|kiriman|uang)\b/i },
+  { type: 'income', regex: /\b(?:transfer|uang)\s+(?:masuk|diterima)\b/i },
+  { type: 'income', regex: /\bdikirim(?:kan)?\s+uang\b/i },
+  { type: 'income', regex: /\b(?:ada\s+)?uang\s+masuk\b/i },
+  { type: 'income', regex: /\b(?:dapat|dapet|mendapat|terima|menerima|diterima|ditransfer|transferan|dikasih|diberi|masuk|pemasukan|pendapatan)\b/i },
+  { type: 'income', regex: /\b(?:gaji|gajian|salary|payroll|upah|honor|bonus|thr|komisi|cashback|hadiah|undian|untung|laba|jual|refund|dividen|bunga)\b/i },
+
+  // Transfer hanya antar dompet sendiri (top up / isi saldo / pindah antar dompet).
+  { type: 'transfer', regex: /\b(?:top\s*up|topup|isi\s+saldo|pindah\s+(?:dana|saldo)|transfer\s+antar\s+dompet)\b/i },
+  { type: 'transfer', regex: new RegExp(`\\btransfer\\b[^,.]{0,30}?\\bke\\s+(?:${OWN_WALLET})\\b`, 'i') },
+
+  // Frasa pengeluaran.
+  { type: 'expense', regex: /\bkirim(?:kan)?\s+uang(?:\s+ke)?\b/i },
+  { type: 'expense', regex: /\btransfer\s+(?:ke|keluar)\b/i },
+  { type: 'expense', regex: /\b(?:bayar|membayar|pembayaran|beli|membeli|pembelian|belanja|jajan|keluar|pengeluaran|sewa|tagihan|utang|hutang|cicilan|donasi|sumbang)\b/i },
+];
+
+export function detectTxnType(text: string): TxnType {
+  const lower = text.toLowerCase();
+  let best: { type: TxnType; index: number; length: number } | null = null;
+
+  for (const marker of TXN_TYPE_MARKERS) {
+    const match = marker.regex.exec(lower);
+    if (!match) continue;
+
+    // Predikat paling awal menang. Jika mulai di posisi yang sama, frasa yang
+    // lebih panjang menang ("transfer ke gopay" = transfer, bukan pengeluaran).
+    if (
+      !best ||
+      match.index < best.index ||
+      (match.index === best.index && match[0].length > best.length)
+    ) {
+      best = { type: marker.type, index: match.index, length: match[0].length };
+    }
+  }
+
+  return best?.type ?? 'expense';
+}
+
+// Deteksi kategori otomatis berdasarkan kata kunci (FR-36, 8.4).
+// `type` wajib diperhatikan agar pemasukan tidak pernah jatuh ke kategori
+// pengeluaran (dan sebaliknya).
+export function guessCategory(text: string, type: TxnType = 'expense'): string {
   const t = text.toLowerCase();
+
+  if (type === 'income') {
+    if (/gaji|gajian|salary|payroll|upah|honor/i.test(t)) {
+      return 'cat-gaji';
+    }
+    if (/invest|dividen|saham|reksadana|deposito|bunga|cuan|profit/i.test(t)) {
+      return 'cat-invest';
+    }
+    if (/hadiah|undian|doorprize|angpao|gift/i.test(t)) {
+      return 'cat-hadiah';
+    }
+    if (/bonus|thr|tunjangan|komisi|freelance|proyek|cashback|refund|jual/i.test(t)) {
+      return 'cat-bonus';
+    }
+    // Fallback pemasukan generik: "Uang Jajan & Hadiah".
+    return 'cat-hadiah';
+  }
+
   if (/makan|minum|kopi|soto|bakso|nasi|resto|warung|cafe|food|snack|gofood|grabfood|mcd|kfc/i.test(t)) {
     return 'cat-makan';
   }
@@ -228,22 +296,32 @@ export function guessCategory(text: string): string {
   if (/obat|apotek|dokter|klinik|kimia farma|k24|vitamin|rumah sakit/i.test(t)) {
     return 'cat-kesehatan';
   }
-  if (/gaji|salary|payroll|upah/i.test(t)) {
-    return 'cat-gaji';
-  }
-  if (/bonus|freelance|proyek|cashback|hadiah/i.test(t)) {
-    return 'cat-bonus';
-  }
   return 'cat-lainnya';
+}
+
+// Deteksi dompet tujuan transfer dari frasa "ke gopay", "top up bca", dst.
+export function guessTransferTarget(text: string): string | undefined {
+  const t = text.toLowerCase();
+  const explicit = t.match(
+    new RegExp(`\\bke\\s+(${OWN_WALLET})\\b`, 'i')
+  );
+  if (explicit) return guessAccount(explicit[1]);
+
+  const topup = t.match(
+    new RegExp(`\\b(?:top\\s*up|topup|isi(?:\\s+saldo)?)\\s+(${OWN_WALLET})\\b`, 'i')
+  );
+  if (topup) return guessAccount(topup[1]);
+
+  return undefined;
 }
 
 // Deteksi dompet otomatis dari kata kunci
 export function guessAccount(text: string): string {
   const t = text.toLowerCase();
-  if (/gopay/i.test(t)) return 'acc-gopay';
-  if (/bca/i.test(t)) return 'acc-bca';
-  if (/shopee|shopeepay/i.test(t)) return 'acc-shopeepay';
-  if (/tunai|cash/i.test(t)) return 'acc-cash';
+  if (/\bgopay\b/i.test(t)) return 'acc-gopay';
+  if (/\bbca\b/i.test(t)) return 'acc-bca';
+  if (/\bshopee(?:pay)?\b/i.test(t)) return 'acc-shopeepay';
+  if (/\btunai\b|\bcash\b/i.test(t)) return 'acc-cash';
   return 'acc-bca';
 }
 
@@ -255,6 +333,9 @@ const VOICE_FILLER_WORDS = new Set([
   'kemudian', 'dan', 'sama', 'juga', 'aku', 'saya', 'tadi', 'barusan', 'habis',
   'top', 'up', 'isi', 'transfer', 'masukkan', 'catat', 'pengeluaran', 'pemasukan',
   'nominal', 'uang', 'sebanyak',
+  // Kata kerja yang menjelaskan arah uang, bukan nama transaksi.
+  'dapat', 'dapet', 'mendapat', 'terima', 'menerima', 'diterima', 'masuk', 'keluar',
+  'dikirim', 'dikirimkan', 'kirim', 'kirimkan', 'jual', 'menjual', 'membayar',
 ]);
 
 const NUMBER_WORDS = new Set([
@@ -297,33 +378,28 @@ export function parseVoiceInput(speech: string): ParsedItem[] {
     const lower = clause.toLowerCase();
     if (!lower.trim()) continue;
 
-    // Tipe transaksi
-    let type: TxnType = 'expense';
-    if (
-      lower.includes('gaji') ||
-      lower.includes('gajian') ||
-      lower.includes('dapat uang') ||
-      lower.includes('terima uang') ||
-      lower.includes('pemasukan') ||
-      lower.includes('pendapatan') ||
-      lower.includes('bonus')
-    ) {
-      type = 'income';
-    } else if (lower.includes('transfer ke') || lower.includes('top up') || lower.includes('topup')) {
-      type = 'transfer';
-    }
+    // Tipe transaksi: predikat paling awal menang.
+    const type = detectTxnType(clause);
 
     const amount = parseIndonesianAmount(clause) ?? 0;
-    const catId = guessCategory(clause);
-    const accId = guessAccount(clause);
+    const catId = guessCategory(clause, type);
     const merchant = extractVoiceMerchant(clause, type);
+
+    let accId = guessAccount(clause);
+    let toAccountId: string | undefined;
+    if (type === 'transfer') {
+      // Untuk transfer, dompet yang disebut adalah tujuan; sumbernya dompet lain.
+      toAccountId = guessTransferTarget(clause) || guessAccount(clause);
+      accId = toAccountId === 'acc-bca' ? 'acc-gopay' : 'acc-bca';
+    }
 
     results.push({
       type,
       amount,
       merchant,
-      category_id: catId,
+      category_id: type === 'transfer' ? undefined : catId,
       account_id: accId,
+      to_account_id: toAccountId,
       note: clause.trim(),
       confidence: amount > 0 ? 0.92 : 0.45,
       source: 'voice',

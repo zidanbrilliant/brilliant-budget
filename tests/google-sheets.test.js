@@ -1,5 +1,13 @@
 import assert from 'assert';
-import { mergeSheetRows } from '../src/services/googleSheets.ts';
+import {
+  mergeSheetRows,
+  normalizeConfigSnapshot,
+  isConfigSyncEnabled,
+  setConfigSyncEnabled,
+  pullConfigFromSheet,
+  pushConfigToSheet,
+  GOOGLE_APPS_SCRIPT_TEMPLATE,
+} from '../src/services/googleSheets.ts';
 
 console.log('--- Testing Google Sheets Sync Logic & Queue ---');
 
@@ -147,5 +155,96 @@ assert.strictEqual(newIncome.category_id, 'cat-gaji');
 const res3Dedup = mergeSheetRows(res3.merged, sheetRows3, mockCategories, mockAccounts);
 assert.strictEqual(res3Dedup.addedCount, 0, 'Should deduplicate fingerprint for rows without ID');
 console.log('   ✓ Rows without ID and fingerprint deduplication verified');
+
+// ================= Config Sheet v2 =================
+console.log('   Testing Config sheet v2...');
+
+assert.strictEqual(isConfigSyncEnabled(), false, 'Config sync harus opt-in');
+setConfigSyncEnabled(true);
+assert.strictEqual(isConfigSyncEnabled(), true, 'Flag config sync tersimpan');
+setConfigSyncEnabled(false);
+assert.strictEqual(isConfigSyncEnabled(), false, 'Flag config sync bisa dimatikan');
+
+assert.strictEqual(
+  normalizeConfigSnapshot({ accounts: [], categories: mockCategories }),
+  null,
+  'Config tanpa dompet ditolak'
+);
+assert.strictEqual(
+  normalizeConfigSnapshot({ accounts: mockAccounts, categories: [] }),
+  null,
+  'Config tanpa kategori ditolak'
+);
+assert.strictEqual(normalizeConfigSnapshot(null), null, 'Config bukan object ditolak');
+
+const validConfig = {
+  accounts: mockAccounts,
+  categories: mockCategories,
+  budget: { id: 'budget-1', method: 'category', period: 'monthly', start_day: 1, is_active: true, total_limit: 1000000, lines: [] },
+  recurring: [],
+  goals: [],
+  settings: { currency: 'IDR', start_day: 1, theme: 'pink', onboarding_completed: true },
+};
+const normalizedConfig = normalizeConfigSnapshot(validConfig);
+assert(normalizedConfig, 'Config valid harus diterima');
+assert.strictEqual(normalizedConfig.accounts.length, 2);
+assert.strictEqual(normalizedConfig.categories.length, 3);
+assert.strictEqual(normalizedConfig.budget.total_limit, 1000000);
+
+assert(
+  GOOGLE_APPS_SCRIPT_TEMPLATE.includes("action === 'config'"),
+  'Template harus punya endpoint config'
+);
+assert(
+  GOOGLE_APPS_SCRIPT_TEMPLATE.includes("getSheetByName('Config')"),
+  'Template harus memakai sheet Config'
+);
+
+// Mock fetch untuk menguji version gate.
+const originalFetch = global.fetch;
+const fetchCalls = [];
+global.fetch = async (url, options = {}) => {
+  fetchCalls.push({ url: String(url), method: options.method || 'GET' });
+  if ((options.method || 'GET') === 'GET') {
+    const isV2 = String(url).includes('/v2/');
+    return {
+      ok: true,
+      text: async () =>
+        JSON.stringify(
+          isV2
+            ? { status: 'ok', version: 2, config: validConfig, updated_at: 123 }
+            : { status: 'ok', data: [] }
+        ),
+    };
+  }
+  return { ok: true };
+};
+
+const v1Url = 'https://script.google.com/macros/s/v1/exec';
+const v1Result = await pushConfigToSheet(v1Url, validConfig);
+assert.strictEqual(v1Result.ok, false, 'Skrip v1 harus ditolak');
+assert(v1Result.message.includes('versi lama'), 'Pesan harus memandu update skrip');
+assert.strictEqual(
+  fetchCalls.filter(call => call.method === 'POST').length,
+  0,
+  'Tidak boleh POST config ke skrip v1'
+);
+
+const v2Url = 'https://script.google.com/macros/s/v2/exec';
+const v2Pull = await pullConfigFromSheet(v2Url);
+assert.strictEqual(v2Pull.version, 2);
+assert(v2Pull.config, 'Config v2 harus terbaca');
+assert.strictEqual(v2Pull.updatedAt, 123);
+
+const v2Result = await pushConfigToSheet(v2Url, validConfig);
+assert.strictEqual(v2Result.ok, true, 'Skrip v2 harus menerima config');
+assert.strictEqual(
+  fetchCalls.filter(call => call.method === 'POST').length,
+  1,
+  'Config v2 harus dikirim lewat POST'
+);
+
+global.fetch = originalFetch;
+console.log('   ✓ Config sheet v2, version gate, dan sanitasi terverifikasi');
 
 console.log('=== SEMUA PENGUJIAN GOOGLE SHEETS LULUS ===');

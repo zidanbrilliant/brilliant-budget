@@ -39,7 +39,55 @@ const parsedVoice2 = parseVoiceInput(sampleVoice2);
 assert.strictEqual(parsedVoice2[0].type, 'income');
 assert.strictEqual(parsedVoice2[0].amount, 10000000);
 assert.strictEqual(parsedVoice2[0].category_id, 'cat-gaji');
-console.log('   ✓ Parser suara multi-transaksi lulus.');
+
+// Predikat paling awal menang, dan kategori harus sesuai jenis transaksi.
+const INCOME_CATS = new Set(['cat-gaji', 'cat-bonus', 'cat-invest', 'cat-hadiah']);
+const EXPENSE_CATS = new Set([
+  'cat-makan',
+  'cat-belanja',
+  'cat-trans',
+  'cat-tagihan',
+  'cat-hiburan',
+  'cat-kesehatan',
+  'cat-pendidikan',
+  'cat-lainnya',
+]);
+const voiceTypeCases = [
+  ['uang masuk 200 ribu', 'income'],
+  ['terima transfer 750 ribu', 'income'],
+  ['dikirim uang 300 ribu', 'income'],
+  ['diterima 1 juta', 'income'],
+  ['masuk 250 ribu', 'income'],
+  ['dapat bonus 500 ribu', 'income'],
+  ['bayar gaji karyawan 5 juta', 'expense'],
+  ['bayar utang 500 ribu dapat bonus', 'expense'],
+  ['beli kopi 25 ribu', 'expense'],
+  ['keluar 40 ribu', 'expense'],
+  ['transfer ke Budi 100 ribu', 'expense'],
+  ['kirim uang ke Ani 100 ribu', 'expense'],
+  ['top up gopay 100 ribu', 'transfer'],
+  ['transfer ke gopay 100 ribu', 'transfer'],
+];
+
+for (const [text, expectedType] of voiceTypeCases) {
+  const item = parseVoiceInput(text)[0];
+  assert.strictEqual(item.type, expectedType, `Tipe salah untuk "${text}"`);
+
+  if (expectedType === 'transfer') {
+    assert.strictEqual(item.category_id, undefined, `Transfer tidak boleh punya kategori: "${text}"`);
+    assert.notStrictEqual(item.account_id, item.to_account_id, `Dompet transfer harus berbeda: "${text}"`);
+  } else {
+    assert(item.category_id, `Kategori wajib ada untuk "${text}"`);
+    const allowed = expectedType === 'income' ? INCOME_CATS : EXPENSE_CATS;
+    assert(
+      allowed.has(item.category_id),
+      `Kategori "${item.category_id}" tidak cocok untuk tipe ${expectedType}: "${text}"`
+    );
+  }
+}
+
+assert.strictEqual(parseVoiceInput('cashback 25 ribu')[0].account_id, 'acc-bca');
+console.log('   ✓ Parser suara multi-transaksi & klasifikasi tipe lulus.');
 
 // ================= 3. Golden OCR Document Dataset (FR-13, 14, 15, Lampiran A) =================
 console.log('3. Menguji Template OCR (BCA, QRIS, Struk Kasir Itemized)...');

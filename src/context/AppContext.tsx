@@ -32,6 +32,12 @@ import {
   mergeSheetRows,
   getSheetWebhookUrl,
   setLastPullTime,
+  isConfigSyncEnabled,
+  setConfigSyncEnabled as persistConfigSyncEnabled,
+  pullConfigFromSheet,
+  pushConfigToSheet,
+  type ConfigSnapshot,
+  type ConfigSyncResult,
 } from '../services/googleSheets';
 
 const STORAGE_KEY = 'CATAT_APP_STATE_V4';
@@ -61,6 +67,10 @@ interface AppContextType {
   clearToast: () => void;
   isBackendConnected: boolean;
   syncFromSheet: (silent?: boolean) => Promise<number>;
+  configSyncEnabled: boolean;
+  setConfigSyncEnabled: (enabled: boolean) => void;
+  saveConfigToSheet: () => Promise<ConfigSyncResult>;
+  restoreConfigFromSheet: () => Promise<ConfigSyncResult>;
 
   // Calculators
   getAccountBalance: (accountId: string) => number;
@@ -175,6 +185,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [catatInitialType, setCatatInitialType] = useState<TxnType>('expense');
   const [toast, setToast] = useState<ToastAction | null>(null);
   const [isBackendConnected, setIsBackendConnected] = useState(false);
+  const [configSyncEnabled, setConfigSyncEnabledState] = useState<boolean>(() =>
+    isConfigSyncEnabled()
+  );
 
   // Sync to Backend if available (with offline fallback)
   useEffect(() => {
@@ -270,6 +283,157 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isSyncingFromSheet.current = false;
     }
   };
+
+  // ===================== Config sync (dompet, kategori, budget, setelan) =====================
+  const lastConfigPushSignature = React.useRef('');
+  const configPushTimer = React.useRef<number | null>(null);
+
+  const buildConfigSnapshot = (): ConfigSnapshot => ({
+    accounts,
+    categories,
+    budget,
+    recurring,
+    goals,
+    settings,
+  });
+
+  const configSignature = (snapshot: ConfigSnapshot): string =>
+    JSON.stringify([
+      snapshot.accounts,
+      snapshot.categories,
+      snapshot.budget,
+      snapshot.recurring,
+      snapshot.goals,
+      snapshot.settings,
+    ]);
+
+  const setConfigSyncEnabled = (enabled: boolean) => {
+    setConfigSyncEnabledState(enabled);
+    persistConfigSyncEnabled(enabled);
+    if (!enabled && configPushTimer.current !== null) {
+      window.clearTimeout(configPushTimer.current);
+      configPushTimer.current = null;
+    }
+  };
+
+  const saveConfigToSheet = async (): Promise<ConfigSyncResult> => {
+    const url = getSheetWebhookUrl();
+    if (!url) {
+      return { ok: false, message: 'Isi URL Webhook Google Sheets terlebih dahulu.' };
+    }
+
+    const snapshot = buildConfigSnapshot();
+    const result = await pushConfigToSheet(url, snapshot);
+    if (result.ok) {
+      lastConfigPushSignature.current = configSignature(snapshot);
+      setConfigSyncEnabled(true);
+    }
+    return result;
+  };
+
+  const restoreConfigFromSheet = async (): Promise<ConfigSyncResult> => {
+    const url = getSheetWebhookUrl();
+    if (!url) {
+      return { ok: false, message: 'Isi URL Webhook Google Sheets terlebih dahulu.' };
+    }
+    if (navigator.onLine === false) {
+      return { ok: false, message: 'Sedang offline. Sambungkan internet lalu coba lagi.' };
+    }
+
+    const pulled = await pullConfigFromSheet(url);
+    if (pulled.version < 2) {
+      return {
+        ok: false,
+        message:
+          pulled.version === 1
+            ? 'Skrip Apps Script masih versi lama. Perbarui kode skrip ke v2 (sheet Config), lalu Deploy ulang.'
+            : 'Tidak bisa memverifikasi skrip. Pastikan URL Web App benar dan akses deployment "Anyone".',
+      };
+    }
+    if (!pulled.config) {
+      return {
+        ok: false,
+        message: 'Belum ada konfigurasi tersimpan di Sheets. Simpan dulu dari perangkat lama.',
+      };
+    }
+
+    const config = pulled.config;
+    const nextBudget = config.budget || budget;
+    const nextRecurring = config.recurring || recurring;
+    const nextGoals = config.goals || goals;
+    // Gabungkan dengan setelan saat ini supaya field baru (mis. preferensi AI)
+    // tidak hilang saat memulihkan cadangan dari versi aplikasi sebelumnya.
+    const nextSettings = config.settings ? { ...settings, ...config.settings } : settings;
+
+    // Pasang signature sebelum state berubah agar efek auto-push tidak
+    // langsung mengirim balik data yang baru saja dipulihkan.
+    lastConfigPushSignature.current = configSignature({
+      accounts: config.accounts,
+      categories: config.categories,
+      budget: nextBudget,
+      recurring: nextRecurring,
+      goals: nextGoals,
+      settings: nextSettings,
+    });
+
+    setAccounts(config.accounts);
+    setCategories(config.categories);
+    setBudget(nextBudget);
+    setRecurring(nextRecurring);
+    setGoals(nextGoals);
+    setSettings(nextSettings);
+
+    // Transaksi memakai konteks hasil restore agar nama kategori/dompet cocok.
+    try {
+      const rows = await pullTransactionsFromSheet(url);
+      if (rows.length > 0) {
+        setTransactions(prev =>
+          mergeSheetRows(prev, rows, config.categories, config.accounts).merged
+        );
+      }
+    } catch (err) {
+      console.warn('Restore transaksi dari Sheets gagal:', err);
+    }
+
+    setConfigSyncEnabled(true);
+    return {
+      ok: true,
+      message:
+        'Dompet, kategori, budget, langganan, target, dan setelan berhasil dipulihkan.',
+    };
+  };
+
+  // Auto-push config setelah ada perubahan nyata. Run pertama hanya dijadikan
+  // baseline supaya instalasi baru tidak menimpa config lama di Sheets.
+  useEffect(() => {
+    if (!configSyncEnabled) return;
+
+    const url = getSheetWebhookUrl();
+    if (!url || !navigator.onLine) return;
+
+    const snapshot = buildConfigSnapshot();
+    const signature = configSignature(snapshot);
+
+    if (!lastConfigPushSignature.current) {
+      lastConfigPushSignature.current = signature;
+      return;
+    }
+    if (signature === lastConfigPushSignature.current) return;
+
+    configPushTimer.current = window.setTimeout(async () => {
+      const result = await pushConfigToSheet(url, snapshot);
+      if (result.ok) {
+        lastConfigPushSignature.current = signature;
+      }
+    }, 1500);
+
+    return () => {
+      if (configPushTimer.current !== null) {
+        window.clearTimeout(configPushTimer.current);
+        configPushTimer.current = null;
+      }
+    };
+  }, [accounts, categories, budget, recurring, goals, settings, configSyncEnabled]);
 
   // Seamless Auto-Sync Google Sheets in background
   useEffect(() => {
@@ -921,6 +1085,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetAllData = () => {
+    // Jangan biarkan reset lokal menimpa config di Sheets secara otomatis.
+    setConfigSyncEnabled(false);
+    lastConfigPushSignature.current = '';
     setAccounts(INITIAL_ACCOUNTS);
     setCategories(INITIAL_CATEGORIES);
     setTransactions(INITIAL_TRANSACTIONS);
@@ -953,6 +1120,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearToast,
         isBackendConnected,
         syncFromSheet,
+        configSyncEnabled,
+        setConfigSyncEnabled,
+        saveConfigToSheet,
+        restoreConfigFromSheet,
         getAccountBalance,
         getTotalNetWorth,
         getMonthSummary,

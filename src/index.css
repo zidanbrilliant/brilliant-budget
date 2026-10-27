@@ -12,6 +12,9 @@
   .pb-tabbar-clearance {
     padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
   }
+  .tabbar-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
   .bottom-safe-toast {
     bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
   }
@@ -36,6 +39,7 @@
   --app-text: #37131d;
   --app-muted: #884b5c;
   --app-accent: #f43f5e;
+  --nav-solid-bg: #fff5f7;
 }
 
 html.theme-light {
@@ -45,6 +49,7 @@ html.theme-light {
   --app-text: #0f172a;
   --app-muted: #64748b;
   --app-accent: #059669;
+  --nav-solid-bg: #ffffff;
 }
 
 html.dark {
@@ -55,6 +60,36 @@ html.dark {
   --app-text: #f8fafc;
   --app-muted: #94a3b8;
   --app-accent: #f43f5e;
+  --nav-solid-bg: #0b0f19;
+}
+
+/*
+ * iOS 26 standalone PWA viewport quirk:
+ * the layout viewport already stops above the home indicator, while the nav
+ * still applies env(safe-area-inset-bottom). That double inset leaves the bar
+ * floating ~34px above the physical bottom with a visible gap below it.
+ * Remove the second inset and paint the exposed strip with the nav colour.
+ */
+html.ios-nav-gap {
+  /* Hanya canvas di bawah layout viewport yang dicat warna nav; body tetap
+     memakai --app-bg agar tema light tidak berubah menjadi putih penuh. */
+  background-color: var(--nav-solid-bg);
+}
+
+html.ios-nav-gap .tabbar-safe-bottom {
+  padding-bottom: 0 !important;
+}
+
+html.ios-nav-gap #app-tabbar nav {
+  background-color: var(--nav-solid-bg) !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Keep full-screen overlays covering the home-indicator strip too. */
+html.ios-nav-gap .fixed.inset-0 {
+  bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
 }
 
 @layer base {

@@ -13,6 +13,7 @@ import {
 import {
   normalizeAIContext,
   normalizeAmount,
+  normalizeCategoryId,
   normalizeConfidence,
   normalizeReceiptResult,
   normalizeVoiceResult,
@@ -244,6 +245,118 @@ console.log('6. Menguji normalisasi suara multi-transaksi...');
   assert.strictEqual(fallback.items.length, 1);
   assert.strictEqual(fallback.items[0].amount, 35000);
   assert.strictEqual(fallback.items[0].account_id, 'acc-gopay');
+}
+
+console.log('6b. Menguji invariant kategori lintas tipe...');
+{
+  const fullContext = {
+    categories: [
+      { id: 'cat-makan', name: 'Makan & Minuman', kind: 'expense' },
+      { id: 'cat-lainnya', name: 'Lainnya', kind: 'expense' },
+      { id: 'cat-gaji', name: 'Gaji Pokok', kind: 'income' },
+      { id: 'cat-bonus', name: 'Bonus & Side Hustle', kind: 'income' },
+      { id: 'cat-invest', name: 'Cuan Investasi', kind: 'income' },
+      { id: 'cat-hadiah', name: 'Uang Jajan & Hadiah', kind: 'income' },
+    ],
+    accounts: context.accounts,
+    today: context.today,
+  };
+
+  // Kategori pengeluaran tidak boleh dipakai untuk pemasukan.
+  assert.strictEqual(
+    normalizeCategoryId('cat-lainnya', 'income', fullContext.categories),
+    'cat-hadiah'
+  );
+  assert.strictEqual(
+    normalizeCategoryId('', 'income', fullContext.categories),
+    'cat-hadiah'
+  );
+  assert.strictEqual(
+    normalizeCategoryId('Makan', 'income', fullContext.categories),
+    'cat-hadiah'
+  );
+
+  // Kategori pemasukan tidak boleh dipakai untuk pengeluaran.
+  assert.strictEqual(
+    normalizeCategoryId('cat-bonus', 'expense', fullContext.categories),
+    'cat-lainnya'
+  );
+  assert.strictEqual(
+    normalizeCategoryId('Gaji', 'expense', fullContext.categories),
+    'cat-lainnya'
+  );
+  assert.strictEqual(
+    normalizeCategoryId('', 'expense', fullContext.categories),
+    'cat-lainnya'
+  );
+
+  // Kategori yang benar tetap dipertahankan, transfer tidak berkategori.
+  assert.strictEqual(
+    normalizeCategoryId('Gaji', 'income', fullContext.categories),
+    'cat-gaji'
+  );
+  assert.strictEqual(
+    normalizeCategoryId('cat-bonus', 'income', fullContext.categories),
+    'cat-bonus'
+  );
+  assert.strictEqual(
+    normalizeCategoryId('cat-gaji', 'transfer', fullContext.categories),
+    undefined
+  );
+
+  const incomeVoice = normalizeVoiceResult(
+    {
+      transcript: 'uang masuk 2 juta',
+      transactions: [
+        {
+          type: 'income',
+          amount: 2000000,
+          merchant: 'Uang masuk',
+          category_id: 'cat-lainnya',
+          account_id: 'BCA',
+        },
+      ],
+    },
+    fullContext
+  );
+  assert.strictEqual(incomeVoice.items[0].category_id, 'cat-hadiah');
+
+  const transferVoice = normalizeVoiceResult(
+    {
+      transcript: 'top up gopay 100 ribu',
+      transactions: [
+        {
+          type: 'transfer',
+          amount: 100000,
+          account_id: 'BCA',
+          to_account_id: 'GoPay',
+        },
+      ],
+    },
+    fullContext
+  );
+  assert.strictEqual(transferVoice.items[0].category_id, undefined);
+  assert.strictEqual(transferVoice.items[0].account_id, 'acc-bca');
+  assert.strictEqual(transferVoice.items[0].to_account_id, 'acc-gopay');
+
+  // Nilai tipe bebas dari model tetap mengikuti predikat paling awal.
+  const freeType = normalizeVoiceResult(
+    {
+      transcript: 'bayar gaji karyawan 5 juta',
+      transactions: [
+        {
+          type: 'bayar gaji karyawan',
+          amount: 5000000,
+          merchant: 'Gaji karyawan',
+          category_id: 'Gaji',
+          account_id: 'BCA',
+        },
+      ],
+    },
+    fullContext
+  );
+  assert.strictEqual(freeType.items[0].type, 'expense');
+  assert.strictEqual(freeType.items[0].category_id, 'cat-lainnya');
 }
 
 console.log('7. Menguji sanitasi konteks AI...');

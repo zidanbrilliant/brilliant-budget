@@ -333,6 +333,42 @@ export const CatatModal: React.FC = () => {
     );
   };
 
+  const updateVoiceItemType = (index: number, type: TxnType) => {
+    setVoiceParsedItems(prev =>
+      prev.map((item, idx) => {
+        if (idx !== index) return item;
+
+        if (type === 'transfer') {
+          const from = item.account_id || selectedAccount;
+          const to =
+            item.to_account_id && item.to_account_id !== from
+              ? item.to_account_id
+              : accounts.find(account => account.id !== from)?.id || from;
+          return {
+            ...item,
+            type,
+            category_id: undefined,
+            account_id: from,
+            to_account_id: to,
+          };
+        }
+
+        const currentCategory = categories.find(category => category.id === item.category_id);
+        const nextCategory =
+          currentCategory && currentCategory.kind === type
+            ? currentCategory.id
+            : categories.find(category => category.kind === type)?.id;
+
+        return {
+          ...item,
+          type,
+          category_id: nextCategory,
+          to_account_id: undefined,
+        };
+      })
+    );
+  };
+
   const handleProcessVoiceInput = () => {
     const text = customVoiceInput.trim();
     if (!text) {
@@ -1339,8 +1375,9 @@ export const CatatModal: React.FC = () => {
 
                   {voiceParsedItems.map((item, idx) => {
                     const cat = categories.find(c => c.id === item.category_id);
-                    const itemCategories = categories.filter(c =>
-                      item.type === 'income' ? c.kind === 'income' : c.kind === 'expense'
+                    const itemCategories = categories.filter(c => c.kind === item.type);
+                    const transferTargets = accounts.filter(
+                      account => account.id !== item.account_id
                     );
                     return (
                       <div
@@ -1370,21 +1407,100 @@ export const CatatModal: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 text-xs">
-                          <select
-                            value={item.category_id || ''}
-                            onChange={e => updateVoiceItem(idx, { category_id: e.target.value })}
-                            className="px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold outline-none max-w-[55%]"
-                          >
-                            {itemCategories.map(c => (
-                              <option key={c.id} value={c.id}>{c.name}</option>
+                        <div className="flex items-center gap-2">
+                          <div className="grid grid-cols-3 gap-1 p-0.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex-1">
+                            {([
+                              { value: 'expense', label: 'Pengeluaran', active: 'bg-rose-500 text-white' },
+                              { value: 'income', label: 'Pemasukan', active: 'bg-emerald-600 text-white' },
+                              { value: 'transfer', label: 'Transfer', active: 'bg-sky-600 text-white' },
+                            ] as const).map(option => (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => updateVoiceItemType(idx, option.value)}
+                                aria-pressed={item.type === option.value}
+                                className={`min-h-[32px] rounded-md text-[10px] font-bold transition ${
+                                  item.type === option.value
+                                    ? option.active
+                                    : 'text-slate-500 dark:text-slate-400'
+                                }`}
+                              >
+                                {option.label}
+                              </button>
                             ))}
-                            {!cat && <option value={item.category_id || ''}>Lainnya</option>}
-                          </select>
-                          <span className="text-slate-400 text-[10px]">
-                            Keyakinan {Math.round(item.confidence * 100)}%
+                          </div>
+                          <span
+                            className="text-slate-400 text-[10px] shrink-0"
+                            title={`Keyakinan ${Math.round(item.confidence * 100)}%`}
+                          >
+                            {Math.round(item.confidence * 100)}%
                           </span>
                         </div>
+
+                        {item.type === 'transfer' ? (
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <label className="flex items-center gap-1 min-w-0 px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                              <span className="text-[9px] font-bold text-slate-400 uppercase">Dari</span>
+                              <select
+                                value={item.account_id || ''}
+                                onChange={e => {
+                                  const nextFrom = e.target.value;
+                                  const nextTo =
+                                    nextFrom === item.to_account_id
+                                      ? accounts.find(account => account.id !== nextFrom)?.id ||
+                                        item.to_account_id
+                                      : item.to_account_id;
+                                  updateVoiceItem(idx, {
+                                    account_id: nextFrom,
+                                    to_account_id: nextTo,
+                                  });
+                                }}
+                                className="flex-1 min-w-0 bg-transparent text-[11px] font-semibold outline-none"
+                              >
+                                {accounts.map(account => (
+                                  <option key={account.id} value={account.id}>
+                                    {account.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="flex items-center gap-1 min-w-0 px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                              <span className="text-[9px] font-bold text-slate-400 uppercase">Ke</span>
+                              <select
+                                value={item.to_account_id || ''}
+                                onChange={e =>
+                                  updateVoiceItem(idx, { to_account_id: e.target.value })
+                                }
+                                className="flex-1 min-w-0 bg-transparent text-[11px] font-semibold outline-none"
+                              >
+                                {(transferTargets.length > 0 ? transferTargets : accounts).map(
+                                  account => (
+                                    <option key={account.id} value={account.id}>
+                                      {account.name}
+                                    </option>
+                                  )
+                                )}
+                              </select>
+                            </label>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-xs">
+                            <select
+                              value={item.category_id || ''}
+                              onChange={e =>
+                                updateVoiceItem(idx, { category_id: e.target.value })
+                              }
+                              className="px-2 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px] font-semibold outline-none max-w-[70%]"
+                            >
+                              {itemCategories.map(c => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
+                              {!cat && <option value={item.category_id || ''}>Lainnya</option>}
+                            </select>
+                          </div>
+                        )}
 
                         {item.amount <= 0 && (
                           <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">

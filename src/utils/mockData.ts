@@ -96,5 +96,5 @@ export const INITIAL_SETTINGS: AppSettings = {
   currency: 'IDR',
   start_day: 1,
   theme: 'pink',
-  onboarding_completed: true,
+  onboarding_completed: false,
 };

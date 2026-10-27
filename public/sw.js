@@ -1,4 +1,4 @@
-const CACHE_NAME = 'brilliant-budget-v6';
+const CACHE_NAME = 'brilliant-budget-v7';
 const PRECACHE_ASSETS = [
   '/manifest.json',
   '/icon.svg',
