@@ -22,9 +22,9 @@ export const IOSFrame: React.FC<IOSFrameProps> = ({ children }) => {
   const isPinkTheme = settings.theme === 'pink';
 
   return (
-    <div className={`min-h-screen ${isPinkTheme ? 'bg-[#FFF0F3]' : 'bg-slate-50 dark:bg-[#060910]'} text-slate-900 dark:text-slate-100 flex justify-center antialiased transition-colors duration-200`}>
+    <div className={`min-h-[100dvh] ${isPinkTheme ? 'bg-[#FFF0F3]' : 'bg-slate-50 dark:bg-[#060910]'} text-slate-900 dark:text-slate-100 flex justify-center antialiased transition-colors duration-200`}>
       {/* Centered Mobile-First App Container */}
-      <div className={`w-full max-w-md min-h-screen ${isPinkTheme ? 'bg-[#FFF5F7] text-[#37131D]' : 'bg-white dark:bg-[#0B0F19]'} border-x border-pink-100/80 dark:border-slate-800/60 flex flex-col relative shadow-xs`}>
+      <div className={`w-full max-w-md min-h-[100dvh] ${isPinkTheme ? 'bg-[#FFF5F7] text-[#37131D]' : 'bg-white dark:bg-[#0B0F19]'} border-x border-pink-100/80 dark:border-slate-800/60 flex flex-col relative shadow-xs`}>
         {/* Clean Application Top Bar with Safe Area Clearance */}
         <header className={`sticky top-0 z-30 ${isPinkTheme ? 'bg-[#FFF5F7]/95 border-pink-100' : 'bg-white/95 dark:bg-[#0B0F19]/95 border-slate-100 dark:border-slate-800/80'} backdrop-blur-md px-4 pb-2.5 pt-safe-top flex items-center justify-between border-b transition-all`}>
           <div className="flex items-center gap-2">
@@ -58,7 +58,7 @@ export const IOSFrame: React.FC<IOSFrameProps> = ({ children }) => {
         </header>
 
         {/* Main Content Area with Bottom Clearance for TabBar */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col pb-tabbar-clearance">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col pb-tabbar-clearance overscroll-contain">
           {children}
         </main>
       </div>

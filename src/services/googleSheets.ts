@@ -94,6 +94,7 @@ export async function pullTransactionsFromSheet(url: string): Promise<SheetRowPa
     });
     if (!response.ok) return [];
     const text = await response.text();
+    if (!text || text.trim().startsWith('<')) return [];
     const parsed = JSON.parse(text);
     const rows = Array.isArray(parsed)
       ? parsed
@@ -194,7 +195,8 @@ export function mergeSheetRows(
     const rowId = (row.id || '').trim();
     const catId = resolveCategoryId(row.category, categories);
     const accId = resolveAccountId(row.account, accounts);
-    const occurredAt = parseDateAndTime(row.date);
+    const parsedDate = parseDateAndTime(row.date);
+    const occurredAt = Number.isFinite(parsedDate) && parsedDate > 0 ? parsedDate : Date.now();
     const type: TxnType =
       row.type === 'income' ? 'income' : row.type === 'transfer' ? 'transfer' : 'expense';
     const note = (row.note || '').trim();
