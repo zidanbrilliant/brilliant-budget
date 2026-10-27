@@ -117,23 +117,23 @@ export const TransaksiView: React.FC = () => {
   const labelClass = `text-[11px] font-bold uppercase block mb-1 ${isPinkTheme ? 'text-pink-500/80' : 'text-slate-400'}`;
 
   return (
-    <div className="p-4 space-y-3.5">
+    <div className="px-4 py-3 space-y-2.5">
       {/* Title & Add button */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className={`text-xl font-bold tracking-tight ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
+          <h1 className={`text-lg font-bold tracking-tight ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
             {isPinkTheme ? 'Riwayat Transaksi ✨' : 'Riwayat Transaksi'}
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-[11px] text-slate-400">
             {filteredTxns.length} dari {totalConfirmed} transaksi
           </p>
         </div>
         <button
           onClick={() => openCatat('manual')}
           aria-label="Tambah transaksi"
-          className={`flex items-center gap-1.5 px-3.5 py-2 ${isPinkTheme ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-200' : 'bg-emerald-600 hover:bg-emerald-500'} text-white rounded-xl text-xs font-semibold shadow-xs transition active:scale-95 shrink-0`}
+          className={`flex items-center gap-1 px-3 py-1.5 ${isPinkTheme ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-200' : 'bg-emerald-600 hover:bg-emerald-500'} text-white rounded-xl text-xs font-semibold shadow-xs transition active:scale-95 shrink-0`}
         >
-          <Plus className="w-4 h-4 stroke-[2.5]" />
+          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
           <span>Tambah</span>
         </button>
       </div>
@@ -147,7 +147,7 @@ export const TransaksiView: React.FC = () => {
           onChange={e => setSearchQuery(e.target.value)}
           placeholder="Cari transaksi, toko, nominal..."
           aria-label="Cari transaksi"
-          className={`w-full pl-9 pr-9 py-2.5 rounded-xl text-base sm:text-xs border outline-none placeholder:text-slate-400 transition ${
+          className={`w-full pl-9 pr-9 py-2 rounded-xl text-xs border outline-none placeholder:text-slate-400 transition ${
             isPinkTheme
               ? 'bg-white border-pink-200 text-[#37131D] focus:border-pink-400'
               : 'bg-slate-100/80 dark:bg-slate-800/80 border-transparent focus:border-slate-300 dark:focus:border-slate-700 text-slate-800 dark:text-slate-100'
@@ -173,7 +173,7 @@ export const TransaksiView: React.FC = () => {
         <button
           onClick={() => setSelectedType('all')}
           aria-pressed={selectedType === 'all'}
-          className={`py-1.5 rounded-lg transition text-center ${
+          className={`py-1 rounded-lg transition text-center ${
             selectedType === 'all'
               ? isPinkTheme ? 'bg-white text-rose-600 font-bold shadow-2xs' : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white font-bold shadow-2xs'
               : isPinkTheme ? 'text-pink-600/70 hover:text-pink-900' : 'text-slate-500 hover:text-slate-800'
@@ -184,7 +184,7 @@ export const TransaksiView: React.FC = () => {
         <button
           onClick={() => setSelectedType('expense')}
           aria-pressed={selectedType === 'expense'}
-          className={`py-1.5 rounded-lg transition text-center ${
+          className={`py-1 rounded-lg transition text-center ${
             selectedType === 'expense'
               ? 'bg-white dark:bg-slate-700 text-rose-600 dark:text-rose-400 font-bold shadow-2xs'
               : isPinkTheme ? 'text-pink-600/70 hover:text-pink-900' : 'text-slate-500 hover:text-slate-800'
@@ -195,7 +195,7 @@ export const TransaksiView: React.FC = () => {
         <button
           onClick={() => setSelectedType('income')}
           aria-pressed={selectedType === 'income'}
-          className={`py-1.5 rounded-lg transition text-center ${
+          className={`py-1 rounded-lg transition text-center ${
             selectedType === 'income'
               ? isPinkTheme ? 'bg-white text-emerald-600 font-bold shadow-2xs' : 'bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 font-bold shadow-2xs'
               : isPinkTheme ? 'text-pink-600/70 hover:text-pink-900' : 'text-slate-500 hover:text-slate-800'
@@ -206,7 +206,7 @@ export const TransaksiView: React.FC = () => {
         <button
           onClick={() => setSelectedType('transfer')}
           aria-pressed={selectedType === 'transfer'}
-          className={`py-1.5 rounded-lg transition text-center ${
+          className={`py-1 rounded-lg transition text-center ${
             selectedType === 'transfer'
               ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 font-bold shadow-2xs'
               : isPinkTheme ? 'text-pink-600/70 hover:text-pink-900' : 'text-slate-500 hover:text-slate-800'
