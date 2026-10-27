@@ -28,7 +28,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { parseOCRText } from '../../utils/parser';
-import { Account, Category } from '../../types/index.ts';
+import { Account, AccountType, Category } from '../../types/index.ts';
 import {
   getSheetWebhookUrl,
   setSheetWebhookUrl,
@@ -48,6 +48,7 @@ export const LainnyaView: React.FC = () => {
     getTotalNetWorth,
     adjustAccountBalance,
     addAccount,
+    updateAccount,
     deleteAccount,
     addCategory,
     updateCategory,
@@ -135,6 +136,11 @@ export const LainnyaView: React.FC = () => {
   const [newWalletName, setNewWalletName] = useState('');
   const [newWalletType, setNewWalletType] = useState<'bank' | 'ewallet' | 'cash'>('bank');
   const [newWalletBalance, setNewWalletBalance] = useState<number>(0);
+
+  // Edit Wallet modal
+  const [editingWallet, setEditingWallet] = useState<Account | null>(null);
+  const [editWalletName, setEditWalletName] = useState('');
+  const [editWalletType, setEditWalletType] = useState<AccountType>('bank');
 
   // Delete Wallet modal
   const [deletingWallet, setDeletingWallet] = useState<Account | null>(null);
@@ -634,16 +640,31 @@ export const LainnyaView: React.FC = () => {
                   key={acc.id}
                   className="p-3.5 flex items-center justify-between gap-2"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <div
                       className="w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0"
                       style={{ backgroundColor: acc.color }}
                     >
                       <AppIcon name={acc.icon} className="w-4 h-4 text-white" />
                     </div>
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                        {acc.name}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                          {acc.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingWallet(acc);
+                            setEditWalletName(acc.name);
+                            setEditWalletType(acc.type);
+                          }}
+                          className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition"
+                          title="Ubah nama dompet"
+                          aria-label={`Ubah nama ${acc.name}`}
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </button>
                       </div>
                       <div className="text-[10px] text-slate-400 uppercase font-semibold">
                         {acc.type}
@@ -1290,6 +1311,91 @@ export const LainnyaView: React.FC = () => {
                 className={`flex-1 py-2 rounded-xl text-xs font-bold transition active:scale-[0.98] ${primaryBtn}`}
               >
                 Tambah
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Edit Nama & Jenis Dompet */}
+      {editingWallet && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className={modalCard}>
+            <div className="flex items-center justify-between pb-1">
+              <h3 className={`font-bold text-sm ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
+                Ubah Dompet
+              </h3>
+              <button
+                type="button"
+                onClick={() => setEditingWallet(null)}
+                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-full transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5 text-xs">
+              <div>
+                <label className={labelClass}>Nama Dompet</label>
+                <input
+                  type="text"
+                  value={editWalletName}
+                  onChange={e => setEditWalletName(e.target.value)}
+                  placeholder="Nama Dompet"
+                  className={fieldClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Jenis</label>
+                <select
+                  value={editWalletType}
+                  onChange={e => setEditWalletType(e.target.value as any)}
+                  className={`${fieldClass} font-semibold`}
+                >
+                  <option value="bank">Rekening Bank</option>
+                  <option value="ewallet">E-Wallet</option>
+                  <option value="cash">Uang Tunai</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setEditingWallet(null)}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold ${secondaryBtn}`}
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!editWalletName.trim() || !editingWallet) return;
+                  const typeChanged = editWalletType !== editingWallet.type;
+                  updateAccount(editingWallet.id, {
+                    name: editWalletName.trim(),
+                    type: editWalletType,
+                    icon: typeChanged
+                      ? editWalletType === 'bank'
+                        ? 'Landmark'
+                        : editWalletType === 'ewallet'
+                        ? 'Smartphone'
+                        : 'Banknote'
+                      : editingWallet.icon,
+                    color: typeChanged
+                      ? editWalletType === 'bank'
+                        ? '#2563EB'
+                        : editWalletType === 'ewallet'
+                        ? '#06B6D4'
+                        : '#16A34A'
+                      : editingWallet.color,
+                  });
+                  showToast(`Dompet diperbarui menjadi "${editWalletName.trim()}"`);
+                  setEditingWallet(null);
+                }}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition active:scale-[0.98] ${primaryBtn}`}
+              >
+                Simpan
               </button>
             </div>
           </div>

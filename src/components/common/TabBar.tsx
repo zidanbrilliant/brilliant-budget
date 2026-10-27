@@ -9,9 +9,9 @@ export const TabBar: React.FC = () => {
   const isPinkTheme = settings.theme === 'pink';
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-40 flex justify-center pointer-events-none">
+    <div id="app-tabbar" className="fixed bottom-0 inset-x-0 z-40 flex justify-center pointer-events-none">
       <nav
-        style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0.5rem)' }}
+        style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 1.25rem)' }}
         className={`w-full max-w-md ${isPinkTheme ? 'bg-[#FFF5F7]/95 border-pink-200/80 shadow-rose-200/20' : 'bg-white/95 dark:bg-[#0B0F19]/95 border-slate-200/70 dark:border-slate-800/80'} backdrop-blur-xl border-t md:border-x flex flex-col pointer-events-auto shadow-xs transition-all`}
       >
         <div className="h-14 flex items-center justify-around px-2 relative">
@@ -32,7 +32,7 @@ export const TabBar: React.FC = () => {
                 </span>
               )}
             </div>
-            <span className="text-[10px] mt-0.5 font-medium tracking-tight">Beranda</span>
+            <span className="text-[11px] mt-0.5 font-medium tracking-tight">Beranda</span>
           </button>
 
           {/* Transaksi */}
@@ -45,7 +45,7 @@ export const TabBar: React.FC = () => {
             }`}
           >
             <ListFilter className="w-5 h-5 stroke-[2.2]" />
-            <span className="text-[10px] mt-0.5 font-medium tracking-tight">Transaksi</span>
+            <span className="text-[11px] mt-0.5 font-medium tracking-tight">Transaksi</span>
           </button>
 
           {/* Center Action Button: + Catat */}
@@ -58,7 +58,7 @@ export const TabBar: React.FC = () => {
             >
               <Plus className="w-6 h-6 stroke-[2.5]" />
             </button>
-            <span className={`text-[9px] font-semibold ${isPinkTheme ? 'text-rose-400' : 'text-slate-500 dark:text-slate-400'} mt-0.5`}>
+            <span className={`text-[10px] font-semibold ${isPinkTheme ? 'text-rose-400' : 'text-slate-500 dark:text-slate-400'} mt-0.5`}>
               Catat
             </span>
           </div>
@@ -73,7 +73,7 @@ export const TabBar: React.FC = () => {
             }`}
           >
             <PieChart className="w-5 h-5 stroke-[2.2]" />
-            <span className="text-[10px] mt-0.5 font-medium tracking-tight">Budget</span>
+            <span className="text-[11px] mt-0.5 font-medium tracking-tight">Budget</span>
           </button>
 
           {/* Lainnya */}
@@ -86,7 +86,7 @@ export const TabBar: React.FC = () => {
             }`}
           >
             <MoreHorizontal className="w-5 h-5 stroke-[2.2]" />
-            <span className="text-[10px] mt-0.5 font-medium tracking-tight">Lainnya</span>
+            <span className="text-[11px] mt-0.5 font-medium tracking-tight">Lainnya</span>
           </button>
         </div>
       </nav>

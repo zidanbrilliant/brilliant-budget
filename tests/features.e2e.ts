@@ -91,6 +91,13 @@ test('lainnya sub-views navigation', async ({ app, screen }) => {
   await screen.getByText('Dompet & Rekening').click();
   await expect(screen.getByRole('button', { name: '+ Dompet' })).toBeVisible();
 
+  // Test wallet edit
+  await screen.getByRole('button', { name: /Ubah nama BCA Utama/i }).click();
+  await expect(screen.getByRole('heading', { name: 'Ubah Dompet' })).toBeVisible();
+  await screen.getByPlaceholder('Nama Dompet').fill('BCA Bisnis');
+  await screen.getByRole('button', { name: 'Simpan', exact: true }).click();
+  await expect(screen.getByText('BCA Bisnis')).toBeVisible();
+
   // Back to menu
   await screen.getByText('Kembali ke Pengaturan').click();
 

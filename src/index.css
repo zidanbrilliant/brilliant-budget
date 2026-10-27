@@ -7,13 +7,13 @@
     padding-top: max(env(safe-area-inset-top, 0px), 0.75rem);
   }
   .pb-safe-bottom {
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 1rem);
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 1.25rem);
   }
   .pb-tabbar-clearance {
-    padding-bottom: calc(5rem + max(env(safe-area-inset-bottom, 0px), 0.75rem));
+    padding-bottom: calc(5.5rem + max(env(safe-area-inset-bottom, 0px), 1.25rem));
   }
   .bottom-safe-toast {
-    bottom: calc(4.75rem + max(env(safe-area-inset-bottom, 0px), 0.75rem));
+    bottom: calc(5rem + max(env(safe-area-inset-bottom, 0px), 1.25rem));
   }
   .scrollbar-none::-webkit-scrollbar {
     display: none;
@@ -129,6 +129,12 @@ html.dark input[type='date']::-webkit-calendar-picker-indicator {
 /* iOS-style tactile press & momentum scrolling */
 .tap-highlight-none {
   -webkit-tap-highlight-color: transparent;
+}
+
+body.modal-open #app-tabbar {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 html, body {

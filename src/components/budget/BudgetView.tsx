@@ -147,6 +147,17 @@ export const BudgetView: React.FC = () => {
   const [selectedMethod, setSelectedMethod] = useState<BudgetMethod>(budget.method);
   const [totalLimitInput, setTotalLimitInput] = useState<number>(budget.total_limit);
 
+  useEffect(() => {
+    if (isEditingBudgetModal) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [isEditingBudgetModal]);
+
   // Per-category budget customization map inside the modal
   const [customCategoryAmounts, setCustomCategoryAmounts] = useState<Record<string, number>>({});
   const [customCategoryRollover, setCustomCategoryRollover] = useState<Record<string, boolean>>({});
@@ -1161,7 +1172,10 @@ export const BudgetView: React.FC = () => {
       {/* Edit Budget Modal */}
       {isEditingBudgetModal && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className={`w-full max-w-md ${modalSurface} rounded-t-[28px] sm:rounded-2xl p-5 max-h-[88dvh] flex flex-col shadow-2xl border-t sm:border border-slate-200 dark:border-slate-800 animate-slide-up sm:animate-scale-up`}>
+          <div className={`w-full max-w-md ${modalSurface} rounded-t-[28px] sm:rounded-2xl p-5 max-h-[92dvh] flex flex-col shadow-2xl border-t sm:border border-slate-200 dark:border-slate-800 animate-slide-up sm:animate-scale-up`}>
+            {/* Grab Bar for Bottom Sheet */}
+            <div className={`w-10 h-1 ${isPinkTheme ? 'bg-pink-300' : 'bg-slate-300 dark:bg-slate-700'} rounded-full mx-auto mb-2 sm:hidden`}></div>
+
             <div className="shrink-0 flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800/80">
               <div>
                 <h3 className={modalTitle}>Metode Anggaran</h3>
@@ -1169,14 +1183,23 @@ export const BudgetView: React.FC = () => {
                   Pilih gaya budgeting dan atur batas bulananmu.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsEditingBudgetModal(false)}
-                aria-label="Tutup"
-                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-full transition"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleSaveBudget}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold ${primaryBtn}`}
+                >
+                  Simpan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingBudgetModal(false)}
+                  aria-label="Tutup"
+                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-full transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto mt-3 pr-1 space-y-3 text-xs overscroll-contain scrollbar-none">
@@ -1321,16 +1344,18 @@ export const BudgetView: React.FC = () => {
 
             <div className="flex gap-2 pt-3 pb-safe-bottom shrink-0 border-t border-slate-100 dark:border-slate-800/80">
               <button
+                type="button"
                 onClick={() => setIsEditingBudgetModal(false)}
                 className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${secondaryBtn}`}
               >
                 Batal
               </button>
               <button
+                type="button"
                 onClick={handleSaveBudget}
                 className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${primaryBtn}`}
               >
-                Simpan
+                Simpan Perubahan
               </button>
             </div>
           </div>
