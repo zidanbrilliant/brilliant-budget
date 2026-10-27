@@ -117,16 +117,16 @@ export const TransaksiView: React.FC = () => {
   const labelClass = `text-[11px] font-bold uppercase block mb-1 ${isPinkTheme ? 'text-pink-500/80' : 'text-slate-400'}`;
 
   return (
-    <div className="px-4 py-3 space-y-2.5">
+    <div className="px-4 py-2.5 space-y-2">
       {/* Title & Add button */}
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className={`text-lg font-bold tracking-tight ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
+        <div className="flex items-baseline gap-2 min-w-0">
+          <h1 className={`text-lg font-bold tracking-tight truncate ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
             {isPinkTheme ? 'Riwayat Transaksi ✨' : 'Riwayat Transaksi'}
           </h1>
-          <p className="text-[11px] text-slate-400">
-            {filteredTxns.length} dari {totalConfirmed} transaksi
-          </p>
+          <span className="text-[10px] text-slate-400 tabular-nums shrink-0">
+            {filteredTxns.length} dari {totalConfirmed}
+          </span>
         </div>
         <button
           onClick={() => openCatat('manual')}
@@ -147,7 +147,7 @@ export const TransaksiView: React.FC = () => {
           onChange={e => setSearchQuery(e.target.value)}
           placeholder="Cari transaksi, toko, nominal..."
           aria-label="Cari transaksi"
-          className={`w-full pl-9 pr-9 py-2 rounded-xl text-xs border outline-none placeholder:text-slate-400 transition ${
+          className={`w-full pl-9 pr-9 py-1.5 rounded-xl text-xs border outline-none placeholder:text-slate-400 transition ${
             isPinkTheme
               ? 'bg-white border-pink-200 text-[#37131D] focus:border-pink-400'
               : 'bg-slate-100/80 dark:bg-slate-800/80 border-transparent focus:border-slate-300 dark:focus:border-slate-700 text-slate-800 dark:text-slate-100'
