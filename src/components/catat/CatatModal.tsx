@@ -149,6 +149,15 @@ export const CatatModal: React.FC = () => {
   // Cek ketersediaan Gemini saat modal dibuka (server proxy atau kunci perangkat).
   useEffect(() => {
     if (!isCatatOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isCatatOpen]);
+
+  useEffect(() => {
+    if (!isCatatOpen) return;
     let mounted = true;
     getAIStatus()
       .then(status => {
@@ -827,7 +836,7 @@ export const CatatModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end justify-center">
-      <div className={`${isPinkTheme ? 'bg-[#FFF5F7] border-pink-200 text-[#37131D]' : 'bg-white dark:bg-[#111827] border-slate-200 dark:border-slate-800'} w-full max-w-md rounded-t-[28px] shadow-2xl max-h-[90dvh] flex flex-col overflow-hidden animate-slide-up border-t pb-[env(safe-area-inset-bottom,0px)]`}>
+      <div className={`${isPinkTheme ? 'bg-[#FFF5F7] border-pink-200 text-[#37131D]' : 'bg-white dark:bg-[#111827] border-slate-200 dark:border-slate-800'} w-full max-w-md rounded-t-[28px] shadow-2xl max-h-[90dvh] flex flex-col overflow-hidden animate-slide-up border-t`}>
         {/* Grab bar & Header */}
         <div className={`pt-3 px-5 pb-2 shrink-0 border-b ${isPinkTheme ? 'border-pink-200/60' : 'border-slate-100 dark:border-slate-800/80'}`}>
           <div className={`w-10 h-1 ${isPinkTheme ? 'bg-pink-300' : 'bg-slate-300 dark:bg-slate-700'} rounded-full mx-auto mb-3`}></div>

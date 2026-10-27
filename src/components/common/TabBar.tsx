@@ -11,7 +11,7 @@ export const TabBar: React.FC = () => {
   return (
     <div className="fixed bottom-0 inset-x-0 z-40 flex justify-center pointer-events-none">
       <nav
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+        style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0.5rem)' }}
         className={`w-full max-w-md ${isPinkTheme ? 'bg-[#FFF5F7]/95 border-pink-200/80 shadow-rose-200/20' : 'bg-white/95 dark:bg-[#0B0F19]/95 border-slate-200/70 dark:border-slate-800/80'} backdrop-blur-xl border-t md:border-x flex flex-col pointer-events-auto shadow-xs transition-all`}
       >
         <div className="h-14 flex items-center justify-around px-2 relative">

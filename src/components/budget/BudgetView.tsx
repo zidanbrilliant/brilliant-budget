@@ -252,19 +252,19 @@ export const BudgetView: React.FC = () => {
         }
       });
 
-      const monthlyLimit = Math.max(0, totalLimitInput);
+      let monthlyLimit = Math.max(0, totalLimitInput);
+      if (monthlyLimit <= 0 && computedTotal > 0) {
+        monthlyLimit = computedTotal + monthlyCommittedCost;
+      }
       const maxAllocation = Math.max(0, monthlyLimit - monthlyCommittedCost);
 
-      if (monthlyLimit <= 0) {
-        showToast('Tentukan dulu batas budget bulanan');
+      if (monthlyLimit <= 0 && computedTotal <= 0) {
+        showToast('Tentukan batas budget bulanan atau isi anggaran kategori');
         return;
       }
 
       if (computedTotal > maxAllocation) {
-        showToast(
-          `Total kategori ${formatIDR(computedTotal)} melebihi jatah ${formatIDR(maxAllocation)} (budget bulanan dikurangi biaya rutin ${formatIDR(monthlyCommittedCost)})`
-        );
-        return;
+        monthlyLimit = computedTotal + monthlyCommittedCost;
       }
 
       updateBudget({
@@ -273,12 +273,14 @@ export const BudgetView: React.FC = () => {
         total_limit: monthlyLimit,
         lines: newLines,
       });
+      showToast('Budget bulanan berhasil disimpan');
     } else {
       updateBudget({
         ...budget,
         method: selectedMethod,
         total_limit: Math.max(0, totalLimitInput),
       });
+      showToast('Budget bulanan berhasil disimpan');
     }
 
     setIsEditingBudgetModal(false);
@@ -1158,16 +1160,26 @@ export const BudgetView: React.FC = () => {
 
       {/* Edit Budget Modal */}
       {isEditingBudgetModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className={`${modalCard} max-h-[90vh] flex flex-col`}>
-            <div className="shrink-0">
-              <h3 className={modalTitle}>Metode Anggaran</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Pilih gaya budgeting dan atur batas bulananmu.
-              </p>
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className={`w-full max-w-md ${modalSurface} rounded-t-[28px] sm:rounded-2xl p-5 max-h-[88dvh] flex flex-col shadow-2xl border-t sm:border border-slate-200 dark:border-slate-800 animate-slide-up sm:animate-scale-up`}>
+            <div className="shrink-0 flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800/80">
+              <div>
+                <h3 className={modalTitle}>Metode Anggaran</h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Pilih gaya budgeting dan atur batas bulananmu.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditingBudgetModal(false)}
+                aria-label="Tutup"
+                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-full transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto mt-3 pr-1 space-y-3 text-xs scrollbar-none">
+            <div className="flex-1 overflow-y-auto mt-3 pr-1 space-y-3 text-xs overscroll-contain scrollbar-none">
               <div>
                 <label className={labelClass}>Pilih Gaya Budgeting</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1206,15 +1218,26 @@ export const BudgetView: React.FC = () => {
               {selectedMethod === 'category' || selectedMethod === 'envelope' ? (
                 <div className="space-y-2.5">
                   <div>
-                    <label className={labelClass}>
-                      Batas Budget Bulanan (Rp)
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className={labelClass}>
+                        Batas Budget Bulanan (Rp)
+                      </label>
+                      {draftCategoryTotal > 0 && totalLimitInput !== draftCategoryTotal + monthlyCommittedCost && (
+                        <button
+                          type="button"
+                          onClick={() => setTotalLimitInput(draftCategoryTotal + monthlyCommittedCost)}
+                          className={`text-[10px] font-bold ${isPinkTheme ? 'text-rose-600 hover:underline' : 'text-emerald-600 hover:underline'}`}
+                        >
+                          Hitung Otomatis ({formatCompactIDR(draftCategoryTotal + monthlyCommittedCost)})
+                        </button>
+                      )}
+                    </div>
                     <input
                       type="number"
                       inputMode="numeric"
                       value={totalLimitInput || ''}
                       onChange={e => setTotalLimitInput(Math.max(0, Number(e.target.value)))}
-                      placeholder="Mis. 5000000"
+                      placeholder={draftCategoryTotal > 0 ? String(draftCategoryTotal + monthlyCommittedCost) : "Mis. 5000000"}
                       className={`${fieldClass} text-sm font-bold tabular-nums`}
                     />
                     <div className="flex items-center justify-between gap-2 mt-1 text-[10px]">
@@ -1232,13 +1255,13 @@ export const BudgetView: React.FC = () => {
                       <label className={`text-[11px] font-bold uppercase ${isPinkTheme ? 'text-pink-600/80' : 'text-slate-400'}`}>
                         Batas Tiap Kategori
                       </label>
-                      <span className={`text-[10px] font-bold tabular-nums ${draftCategoryTotal > draftMaxAllocation ? 'text-rose-500' : isPinkTheme ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      <span className={`text-[10px] font-bold tabular-nums ${totalLimitInput > 0 && draftCategoryTotal > draftMaxAllocation ? 'text-rose-500' : isPinkTheme ? 'text-rose-600' : 'text-emerald-600'}`}>
                         {formatIDR(draftCategoryTotal)} / {formatIDR(draftMaxAllocation)}
                       </span>
                     </div>
-                    {draftCategoryTotal > draftMaxAllocation && (
+                    {totalLimitInput > 0 && draftCategoryTotal > draftMaxAllocation && (
                       <p className="text-[10px] text-rose-500 font-semibold mb-1.5">
-                        Total kategori melebihi jatah. Kurangi nominal atau naikkan budget bulanan.
+                        Total kategori melebihi jatah. Simpan otomatis menyesuaikan batas total.
                       </p>
                     )}
                     <div className="space-y-1.5">
@@ -1296,16 +1319,16 @@ export const BudgetView: React.FC = () => {
               )}
             </div>
 
-            <div className="flex gap-2 pt-3 shrink-0">
+            <div className="flex gap-2 pt-3 pb-safe-bottom shrink-0 border-t border-slate-100 dark:border-slate-800/80">
               <button
                 onClick={() => setIsEditingBudgetModal(false)}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold ${secondaryBtn}`}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${secondaryBtn}`}
               >
                 Batal
               </button>
               <button
                 onClick={handleSaveBudget}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold ${primaryBtn}`}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${primaryBtn}`}
               >
                 Simpan
               </button>
