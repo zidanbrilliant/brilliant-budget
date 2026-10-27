@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext';
 import { formatIDR, formatCompactIDR } from '../../utils/formatters';
 import { AppIcon } from '../common/IconHelper';
@@ -1170,39 +1171,42 @@ export const BudgetView: React.FC = () => {
       )}
 
       {/* Edit Budget Modal */}
-      {isEditingBudgetModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className={`w-full max-w-md ${modalSurface} rounded-t-[28px] sm:rounded-2xl p-5 max-h-[92dvh] flex flex-col shadow-2xl border-t sm:border border-slate-200 dark:border-slate-800 animate-slide-up sm:animate-scale-up`}>
-            {/* Grab Bar for Bottom Sheet */}
-            <div className={`w-10 h-1 ${isPinkTheme ? 'bg-pink-300' : 'bg-slate-300 dark:bg-slate-700'} rounded-full mx-auto mb-2 sm:hidden`}></div>
-
-            <div className="shrink-0 flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800/80">
-              <div>
-                <h3 className={modalTitle}>Metode Anggaran</h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Pilih gaya budgeting dan atur batas bulananmu.
-                </p>
+      {isEditingBudgetModal &&
+        createPortal(
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end justify-center">
+            <div className={`w-full max-w-md ${modalSurface} rounded-t-[28px] max-h-[92dvh] flex flex-col shadow-2xl border-t border-slate-200 dark:border-slate-800 animate-slide-up overflow-hidden`}>
+              {/* Grab Bar for Bottom Sheet */}
+              <div className="pt-3 pb-1 shrink-0 flex justify-center">
+                <div className={`w-10 h-1 ${isPinkTheme ? 'bg-pink-300' : 'bg-slate-300 dark:bg-slate-700'} rounded-full`}></div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleSaveBudget}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold ${primaryBtn}`}
-                >
-                  Simpan
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsEditingBudgetModal(false)}
-                  aria-label="Tutup"
-                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-full transition"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
 
-            <div className="flex-1 overflow-y-auto mt-3 pr-1 space-y-3 text-xs overscroll-contain scrollbar-none">
+              <div className="shrink-0 flex items-center justify-between px-5 pb-2.5 border-b border-slate-100 dark:border-slate-800/80">
+                <div>
+                  <h3 className={modalTitle}>Metode Anggaran</h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Pilih gaya budgeting dan atur batas bulananmu.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSaveBudget}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold ${primaryBtn}`}
+                  >
+                    Simpan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingBudgetModal(false)}
+                    aria-label="Tutup"
+                    className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-full transition"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3 text-xs overscroll-contain scrollbar-none">
               <div>
                 <label className={labelClass}>Pilih Gaya Budgeting</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -1342,7 +1346,7 @@ export const BudgetView: React.FC = () => {
               )}
             </div>
 
-            <div className="flex gap-2 pt-3 pb-safe-bottom shrink-0 border-t border-slate-100 dark:border-slate-800/80">
+            <div className="flex gap-2 px-5 pt-3 pb-safe-bottom shrink-0 border-t border-slate-100 dark:border-slate-800/80">
               <button
                 type="button"
                 onClick={() => setIsEditingBudgetModal(false)}
@@ -1359,348 +1363,358 @@ export const BudgetView: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Quick Edit Single Category Line Modal */}
-      {editingLineCatId && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className={`${modalCard} space-y-3.5`}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className={modalTitle}>
-                  Sesuaikan Anggaran Kategori
-                </h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Atur batas pengeluaran khusus kategori ini.
-                </p>
-              </div>
-              <button
-                onClick={() => setEditingLineCatId(null)}
-                aria-label="Tutup"
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className={`p-3 rounded-xl flex items-center gap-2.5 border ${isPinkTheme ? 'bg-pink-50 border-pink-100' : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200/60 dark:border-slate-700/60'}`}>
-                <div
-                  className="w-8 h-8 rounded-xl flex items-center justify-center text-white"
-                  style={{ backgroundColor: categories.find(c => c.id === editingLineCatId)?.color || '#FB7185' }}
-                >
-                  <AppIcon name={categories.find(c => c.id === editingLineCatId)?.icon || 'Heart'} className="w-4 h-4 text-white" />
-                </div>
+      {editingLineCatId &&
+        createPortal(
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className={`${modalCard} space-y-3.5`}>
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className={`font-bold ${isPinkTheme ? 'text-pink-900' : 'text-slate-900 dark:text-white'}`}>
-                    {categories.find(c => c.id === editingLineCatId)?.name}
-                  </div>
-                  <div className="text-[10px] text-slate-400">Batas bulanan saat ini</div>
+                  <h3 className={modalTitle}>
+                    Sesuaikan Anggaran Kategori
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Atur batas pengeluaran khusus kategori ini.
+                  </p>
                 </div>
+                <button
+                  onClick={() => setEditingLineCatId(null)}
+                  aria-label="Tutup"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
-              <div>
-                <label className={labelClass}>
-                  Nominal Anggaran Bulanan (Rp)
+              <div className="space-y-3 text-xs">
+                <div className={`p-3 rounded-xl flex items-center gap-2.5 border ${isPinkTheme ? 'bg-pink-50 border-pink-100' : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200/60 dark:border-slate-700/60'}`}>
+                  <div
+                    className="w-8 h-8 rounded-xl flex items-center justify-center text-white"
+                    style={{ backgroundColor: categories.find(c => c.id === editingLineCatId)?.color || '#FB7185' }}
+                  >
+                    <AppIcon name={categories.find(c => c.id === editingLineCatId)?.icon || 'Heart'} className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <div className={`font-bold ${isPinkTheme ? 'text-pink-900' : 'text-slate-900 dark:text-white'}`}>
+                      {categories.find(c => c.id === editingLineCatId)?.name}
+                    </div>
+                    <div className="text-[10px] text-slate-400">Batas bulanan saat ini</div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelClass}>
+                    Nominal Anggaran Bulanan (Rp)
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={editingLineAmount || ''}
+                    placeholder="0"
+                    onChange={e => setEditingLineAmount(Math.max(0, Number(e.target.value)))}
+                    className={`${fieldClass} text-base font-bold tabular-nums`}
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Maksimal untuk semua kategori: {formatIDR(Math.max(0, totalBudget - monthlyCommittedCost))}
+                  </p>
+                </div>
+
+                <label className={`flex items-center gap-2 cursor-pointer p-2.5 rounded-xl border ${isPinkTheme ? 'bg-pink-50/50 border-pink-200' : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700'}`}>
+                  <input
+                    type="checkbox"
+                    checked={editingLineRollover}
+                    onChange={e => setEditingLineRollover(e.target.checked)}
+                    className={`w-4 h-4 ${isPinkTheme ? 'accent-rose-500' : 'accent-emerald-600'}`}
+                  />
+                  <span className="font-medium text-slate-700 dark:text-slate-300 text-xs">
+                    Rollover sisa anggaran ke bulan berikutnya
+                  </span>
                 </label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={editingLineAmount || ''}
-                  placeholder="0"
-                  onChange={e => setEditingLineAmount(Math.max(0, Number(e.target.value)))}
-                  className={`${fieldClass} text-base font-bold tabular-nums`}
-                />
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Maksimal untuk semua kategori: {formatIDR(Math.max(0, totalBudget - monthlyCommittedCost))}
-                </p>
               </div>
 
-              <label className={`flex items-center gap-2 cursor-pointer p-2.5 rounded-xl border ${isPinkTheme ? 'bg-pink-50/50 border-pink-200' : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700'}`}>
-                <input
-                  type="checkbox"
-                  checked={editingLineRollover}
-                  onChange={e => setEditingLineRollover(e.target.checked)}
-                  className={`w-4 h-4 ${isPinkTheme ? 'accent-rose-500' : 'accent-emerald-600'}`}
-                />
-                <span className="font-medium text-slate-700 dark:text-slate-300 text-xs">
-                  Rollover sisa anggaran ke bulan berikutnya
-                </span>
-              </label>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => handleRemoveLine(editingLineCatId)}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold ${dangerBtn}`}
+                >
+                  Hapus
+                </button>
+                <button
+                  onClick={handleSaveQuickLine}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold ${primaryBtn}`}
+                >
+                  Simpan Nominal
+                </button>
+              </div>
             </div>
-
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => handleRemoveLine(editingLineCatId)}
-                className={`px-3 py-2 rounded-xl text-xs font-bold ${dangerBtn}`}
-              >
-                Hapus
-              </button>
-              <button
-                onClick={handleSaveQuickLine}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold ${primaryBtn}`}
-              >
-                Simpan Nominal
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
 
       {/* New Goal Modal */}
-      {isGoalModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className={`${modalCard} space-y-4`}>
-            <div>
-              <h3 className={modalTitle}>
-                Target Tabungan Baru
-              </h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Tentukan impian dan nominal yang ingin dicapai.
-              </p>
-            </div>
-            <div className="space-y-3 text-xs">
+      {isGoalModalOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className={`${modalCard} space-y-4`}>
               <div>
-                <label className={labelClass}>Nama Target</label>
-                <input
-                  type="text"
-                  value={goalName}
-                  onChange={e => setGoalName(e.target.value)}
-                  placeholder="Mis. Dana Darurat, Liburan"
-                  className={`${fieldClass} text-xs font-semibold`}
-                />
+                <h3 className={modalTitle}>
+                  Target Tabungan Baru
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Tentukan impian dan nominal yang ingin dicapai.
+                </p>
               </div>
-              <div>
-                <label className={labelClass}>Nominal Target (Rp)</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={goalTarget || ''}
-                  onChange={e => setGoalTarget(Math.max(0, Number(e.target.value)))}
-                  placeholder="5000000"
-                  className={`${fieldClass} text-sm font-bold tabular-nums`}
-                />
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className={labelClass}>Nama Target</label>
+                  <input
+                    type="text"
+                    value={goalName}
+                    onChange={e => setGoalName(e.target.value)}
+                    placeholder="Mis. Dana Darurat, Liburan"
+                    className={`${fieldClass} text-xs font-semibold`}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Nominal Target (Rp)</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={goalTarget || ''}
+                    onChange={e => setGoalTarget(Math.max(0, Number(e.target.value)))}
+                    placeholder="5000000"
+                    className={`${fieldClass} text-sm font-bold tabular-nums`}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>
+                    Tenggat Waktu <span className="normal-case font-medium text-slate-400/80">(opsional)</span>
+                  </label>
+                  <DateField
+                    value={goalDueDate}
+                    onChange={setGoalDueDate}
+                    ariaLabel="Tenggat waktu"
+                    isPinkTheme={isPinkTheme}
+                  />
+                </div>
               </div>
-              <div>
-                <label className={labelClass}>
-                  Tenggat Waktu <span className="normal-case font-medium text-slate-400/80">(opsional)</span>
-                </label>
-                <DateField
-                  value={goalDueDate}
-                  onChange={setGoalDueDate}
-                  ariaLabel="Tenggat waktu"
-                  isPinkTheme={isPinkTheme}
-                />
+              <div className="flex gap-2.5 pt-1">
+                <button
+                  onClick={() => setIsGoalModalOpen(false)}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${secondaryBtn}`}
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleCreateGoal}
+                  disabled={!goalName.trim() || goalTarget <= 0}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 ${primaryBtn}`}
+                >
+                  Simpan Target
+                </button>
               </div>
             </div>
-            <div className="flex gap-2.5 pt-1">
-              <button
-                onClick={() => setIsGoalModalOpen(false)}
-                className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${secondaryBtn}`}
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleCreateGoal}
-                disabled={!goalName.trim() || goalTarget <= 0}
-                className={`flex-1 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 ${primaryBtn}`}
-              >
-                Simpan Target
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
 
       {/* Modal Setor Tabungan (Nominal Custom & Pilih Dompet) */}
-      {contributeGoal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className={`${modalCard} space-y-4`}>
-            <div>
-              <h3 className={modalTitle}>
-                Setor ke: {contributeGoal.name}
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Target: {formatIDR(contributeGoal.target_amount)} • Terkumpul: {formatIDR(contributeGoal.saved_amount)}
-              </p>
-            </div>
-
-            <div className="space-y-3 text-xs">
+      {contributeGoal &&
+        createPortal(
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className={`${modalCard} space-y-4`}>
               <div>
-                <label className={labelClass}>
-                  Nominal Setor (Rp)
-                </label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={contributeAmount || ''}
-                  onChange={e => setContributeAmount(Math.max(0, Number(e.target.value)))}
-                  placeholder="Masukkan nominal bebas"
-                  className={`${fieldClass} text-base font-bold tabular-nums`}
-                />
+                <h3 className={modalTitle}>
+                  Setor ke: {contributeGoal.name}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Target: {formatIDR(contributeGoal.target_amount)} • Terkumpul: {formatIDR(contributeGoal.saved_amount)}
+                </p>
               </div>
 
-              {/* Quick Chips */}
-              <div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                  Pilihan Cepat
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {[50000, 100000, 250000, 500000, 1000000].map(amt => (
-                    <button
-                      key={amt}
-                      type="button"
-                      onClick={() => setContributeAmount(amt)}
-                      className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition active:scale-95 ${
-                        contributeAmount === amt
-                          ? isPinkTheme
-                            ? 'bg-rose-500 text-white border-rose-500'
-                            : 'bg-emerald-600 text-white border-emerald-600'
-                          : isPinkTheme
-                          ? 'border-pink-200 bg-white text-pink-700 hover:border-pink-300'
-                          : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      +{formatCompactIDR(amt)}
-                    </button>
-                  ))}
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className={labelClass}>
+                    Nominal Setor (Rp)
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={contributeAmount || ''}
+                    onChange={e => setContributeAmount(Math.max(0, Number(e.target.value)))}
+                    placeholder="Masukkan nominal bebas"
+                    className={`${fieldClass} text-base font-bold tabular-nums`}
+                  />
+                </div>
+
+                {/* Quick Chips */}
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                    Pilihan Cepat
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[50000, 100000, 250000, 500000, 1000000].map(amt => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setContributeAmount(amt)}
+                        className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition active:scale-95 ${
+                          contributeAmount === amt
+                            ? isPinkTheme
+                              ? 'bg-rose-500 text-white border-rose-500'
+                              : 'bg-emerald-600 text-white border-emerald-600'
+                            : isPinkTheme
+                            ? 'border-pink-200 bg-white text-pink-700 hover:border-pink-300'
+                            : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                        }`}
+                      >
+                        +{formatCompactIDR(amt)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Source Account Selector */}
+                <div>
+                  <label className={labelClass}>
+                    Potong Dari Dompet
+                  </label>
+                  <select
+                    value={contributeAccountId}
+                    onChange={e => setContributeAccountId(e.target.value)}
+                    className={`${fieldClass} py-2.5 font-semibold text-xs`}
+                  >
+                    {accounts.map(acc => {
+                      return (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.name} ({formatCompactIDR(getAccountBalance(acc.id))})
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
               </div>
 
-              {/* Source Account Selector */}
-              <div>
-                <label className={labelClass}>
-                  Potong Dari Dompet
-                </label>
-                <select
-                  value={contributeAccountId}
-                  onChange={e => setContributeAccountId(e.target.value)}
-                  className={`${fieldClass} py-2.5 font-semibold text-xs`}
+              <div className="flex gap-2.5 pt-1">
+                <button
+                  onClick={() => setContributeGoal(null)}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${secondaryBtn}`}
                 >
-                  {accounts.map(acc => {
-                    return (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.name} ({formatCompactIDR(getAccountBalance(acc.id))})
-                      </option>
-                    );
-                  })}
-                </select>
+                  Batal
+                </button>
+                <button
+                  onClick={handleConfirmContribute}
+                  disabled={contributeAmount <= 0}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 ${primaryBtn}`}
+                >
+                  Konfirmasi Setor
+                </button>
               </div>
             </div>
-
-            <div className="flex gap-2.5 pt-1">
-              <button
-                onClick={() => setContributeGoal(null)}
-                className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${secondaryBtn}`}
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleConfirmContribute}
-                disabled={contributeAmount <= 0}
-                className={`flex-1 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 ${primaryBtn}`}
-              >
-                Konfirmasi Setor
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
 
       {/* Modal Edit Target Tabungan */}
-      {editingGoal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className={`${modalCard} space-y-4`}>
-            <div>
-              <h3 className={modalTitle}>
-                Edit Target Tabungan
-              </h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Perbarui nama, nominal, atau tenggat target.
-              </p>
-            </div>
-
-            <div className="space-y-3 text-xs">
+      {editingGoal &&
+        createPortal(
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className={`${modalCard} space-y-4`}>
               <div>
-                <label className={labelClass}>
-                  Nama Target
-                </label>
-                <input
-                  type="text"
-                  value={editGoalName}
-                  onChange={e => setEditGoalName(e.target.value)}
-                  placeholder="Mis. Dana Darurat, Beli HP"
-                  className={`${fieldClass} text-xs font-semibold`}
-                />
+                <h3 className={modalTitle}>
+                  Edit Target Tabungan
+                </h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Perbarui nama, nominal, atau tenggat target.
+                </p>
               </div>
 
-              <div>
-                <label className={labelClass}>
-                  Nominal Target (Rp)
-                </label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={editGoalTarget || ''}
-                  onChange={e => setEditGoalTarget(Math.max(0, Number(e.target.value)))}
-                  className={`${fieldClass} text-sm font-bold tabular-nums`}
-                />
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className={labelClass}>
+                    Nama Target
+                  </label>
+                  <input
+                    type="text"
+                    value={editGoalName}
+                    onChange={e => setEditGoalName(e.target.value)}
+                    placeholder="Mis. Dana Darurat, Beli HP"
+                    className={`${fieldClass} text-xs font-semibold`}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass}>
+                    Nominal Target (Rp)
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={editGoalTarget || ''}
+                    onChange={e => setEditGoalTarget(Math.max(0, Number(e.target.value)))}
+                    className={`${fieldClass} text-sm font-bold tabular-nums`}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass}>
+                    Tenggat Waktu <span className="normal-case font-medium text-slate-400/80">(opsional)</span>
+                  </label>
+                  <DateField
+                    value={editGoalDueDate}
+                    onChange={setEditGoalDueDate}
+                    ariaLabel="Tenggat waktu"
+                    isPinkTheme={isPinkTheme}
+                  />
+                </div>
+
+                <div className={`text-[11px] p-2.5 rounded-xl border ${
+                  isPinkTheme
+                    ? 'text-pink-600/80 bg-pink-50 border-pink-100'
+                    : 'text-slate-400 bg-slate-50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-800'
+                }`}>
+                  Terkumpul saat ini: <span className={`font-bold ${isPinkTheme ? 'text-pink-800' : 'text-slate-700 dark:text-slate-200'}`}>{formatIDR(editingGoal.saved_amount)}</span>
+                </div>
               </div>
 
-              <div>
-                <label className={labelClass}>
-                  Tenggat Waktu <span className="normal-case font-medium text-slate-400/80">(opsional)</span>
-                </label>
-                <DateField
-                  value={editGoalDueDate}
-                  onChange={setEditGoalDueDate}
-                  ariaLabel="Tenggat waktu"
-                  isPinkTheme={isPinkTheme}
-                />
-              </div>
-
-              <div className={`text-[11px] p-2.5 rounded-xl border ${
-                isPinkTheme
-                  ? 'text-pink-600/80 bg-pink-50 border-pink-100'
-                  : 'text-slate-400 bg-slate-50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-800'
-              }`}>
-                Terkumpul saat ini: <span className={`font-bold ${isPinkTheme ? 'text-pink-800' : 'text-slate-700 dark:text-slate-200'}`}>{formatIDR(editingGoal.saved_amount)}</span>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleDeleteGoal(editingGoal.id)}
+                  className={`py-2.5 px-3 rounded-xl text-xs font-bold ${dangerBtn}`}
+                >
+                  Hapus
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingGoal(null)}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${secondaryBtn}`}
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUpdateGoal}
+                  disabled={!editGoalName.trim() || editGoalTarget <= 0}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 ${primaryBtn}`}
+                >
+                  Simpan
+                </button>
               </div>
             </div>
-
-            <div className="flex items-center gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => handleDeleteGoal(editingGoal.id)}
-                className={`py-2.5 px-3 rounded-xl text-xs font-bold ${dangerBtn}`}
-              >
-                Hapus
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditingGoal(null)}
-                className={`flex-1 py-2.5 rounded-xl text-xs font-bold ${secondaryBtn}`}
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleUpdateGoal}
-                disabled={!editGoalName.trim() || editGoalTarget <= 0}
-                className={`flex-1 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50 ${primaryBtn}`}
-              >
-                Simpan
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
 
       {/* Add / Edit Recurring Modal */}
-      {isAddRecurringOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className={`${modalCard} max-h-[90vh] flex flex-col`}>
+      {isAddRecurringOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className={`${modalCard} max-h-[90vh] flex flex-col`}>
             <div className="flex items-start justify-between gap-3 shrink-0">
               <div>
                 <h3 className={modalTitle}>
@@ -1932,7 +1946,8 @@ export const BudgetView: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

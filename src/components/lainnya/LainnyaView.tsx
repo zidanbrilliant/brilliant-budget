@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../../context/AppContext';
 import { formatIDR, formatCompactIDR } from '../../utils/formatters';
 import { AppIcon } from '../common/IconHelper';
@@ -1244,163 +1245,167 @@ export const LainnyaView: React.FC = () => {
       )}
 
       {/* Modal Tambah Dompet Baru */}
-      {isAddWalletOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className={modalCard}>
-            <h3 className={`font-bold text-sm ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
-              Tambah Dompet Baru
-            </h3>
-            <div className="space-y-2.5 text-xs">
-              <div>
-                <label className={labelClass}>Nama Dompet</label>
-                <input
-                  type="text"
-                  value={newWalletName}
-                  onChange={e => setNewWalletName(e.target.value)}
-                  placeholder="Mis. Mandiri Tabungan"
-                  className={fieldClass}
-                />
+      {isAddWalletOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className={modalCard}>
+              <h3 className={`font-bold text-sm ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
+                Tambah Dompet Baru
+              </h3>
+              <div className="space-y-2.5 text-xs">
+                <div>
+                  <label className={labelClass}>Nama Dompet</label>
+                  <input
+                    type="text"
+                    value={newWalletName}
+                    onChange={e => setNewWalletName(e.target.value)}
+                    placeholder="Mis. Mandiri Tabungan"
+                    className={fieldClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Jenis</label>
+                  <select
+                    value={newWalletType}
+                    onChange={e => setNewWalletType(e.target.value as any)}
+                    className={`${fieldClass} font-semibold`}
+                  >
+                    <option value="bank">Rekening Bank</option>
+                    <option value="ewallet">E-Wallet</option>
+                    <option value="cash">Uang Tunai</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Saldo Awal (Rp)</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={newWalletBalance || ''}
+                    placeholder="0"
+                    onChange={e => setNewWalletBalance(Math.max(0, Number(e.target.value)))}
+                    className={`${fieldClass} font-bold tabular-nums`}
+                  />
+                </div>
               </div>
-              <div>
-                <label className={labelClass}>Jenis</label>
-                <select
-                  value={newWalletType}
-                  onChange={e => setNewWalletType(e.target.value as any)}
-                  className={`${fieldClass} font-semibold`}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => setIsAddWalletOpen(false)}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold ${secondaryBtn}`}
                 >
-                  <option value="bank">Rekening Bank</option>
-                  <option value="ewallet">E-Wallet</option>
-                  <option value="cash">Uang Tunai</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Saldo Awal (Rp)</label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={newWalletBalance || ''}
-                  placeholder="0"
-                  onChange={e => setNewWalletBalance(Math.max(0, Number(e.target.value)))}
-                  className={`${fieldClass} font-bold tabular-nums`}
-                />
+                  Batal
+                </button>
+                <button
+                  onClick={() => {
+                    if (!newWalletName.trim()) return;
+                    addAccount({
+                      name: newWalletName.trim(),
+                      type: newWalletType,
+                      currency: 'IDR',
+                      opening_balance: newWalletBalance,
+                      icon: newWalletType === 'bank' ? 'Landmark' : newWalletType === 'ewallet' ? 'Smartphone' : 'Banknote',
+                      color: newWalletType === 'bank' ? '#2563EB' : newWalletType === 'ewallet' ? '#06B6D4' : '#16A34A',
+                      is_archived: false,
+                    });
+                    setNewWalletName('');
+                    setNewWalletBalance(0);
+                    setIsAddWalletOpen(false);
+                  }}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition active:scale-[0.98] ${primaryBtn}`}
+                >
+                  Tambah
+                </button>
               </div>
             </div>
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={() => setIsAddWalletOpen(false)}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold ${secondaryBtn}`}
-              >
-                Batal
-              </button>
-              <button
-                onClick={() => {
-                  if (!newWalletName.trim()) return;
-                  addAccount({
-                    name: newWalletName.trim(),
-                    type: newWalletType,
-                    currency: 'IDR',
-                    opening_balance: newWalletBalance,
-                    icon: newWalletType === 'bank' ? 'Landmark' : newWalletType === 'ewallet' ? 'Smartphone' : 'Banknote',
-                    color: newWalletType === 'bank' ? '#2563EB' : newWalletType === 'ewallet' ? '#06B6D4' : '#16A34A',
-                    is_archived: false,
-                  });
-                  setNewWalletName('');
-                  setNewWalletBalance(0);
-                  setIsAddWalletOpen(false);
-                }}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold transition active:scale-[0.98] ${primaryBtn}`}
-              >
-                Tambah
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
 
       {/* Modal Edit Nama & Jenis Dompet */}
-      {editingWallet && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className={modalCard}>
-            <div className="flex items-center justify-between pb-1">
-              <h3 className={`font-bold text-sm ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
-                Ubah Dompet
-              </h3>
-              <button
-                type="button"
-                onClick={() => setEditingWallet(null)}
-                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-full transition"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-2.5 text-xs">
-              <div>
-                <label className={labelClass}>Nama Dompet</label>
-                <input
-                  type="text"
-                  value={editWalletName}
-                  onChange={e => setEditWalletName(e.target.value)}
-                  placeholder="Nama Dompet"
-                  className={fieldClass}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Jenis</label>
-                <select
-                  value={editWalletType}
-                  onChange={e => setEditWalletType(e.target.value as any)}
-                  className={`${fieldClass} font-semibold`}
+      {editingWallet &&
+        createPortal(
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className={modalCard}>
+              <div className="flex items-center justify-between pb-1">
+                <h3 className={`font-bold text-sm ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>
+                  Ubah Dompet
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setEditingWallet(null)}
+                  className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-full transition"
                 >
-                  <option value="bank">Rekening Bank</option>
-                  <option value="ewallet">E-Wallet</option>
-                  <option value="cash">Uang Tunai</option>
-                </select>
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-2.5 text-xs">
+                <div>
+                  <label className={labelClass}>Nama Dompet</label>
+                  <input
+                    type="text"
+                    value={editWalletName}
+                    onChange={e => setEditWalletName(e.target.value)}
+                    placeholder="Nama Dompet"
+                    className={fieldClass}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Jenis</label>
+                  <select
+                    value={editWalletType}
+                    onChange={e => setEditWalletType(e.target.value as any)}
+                    className={`${fieldClass} font-semibold`}
+                  >
+                    <option value="bank">Rekening Bank</option>
+                    <option value="ewallet">E-Wallet</option>
+                    <option value="cash">Uang Tunai</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingWallet(null)}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold ${secondaryBtn}`}
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!editWalletName.trim() || !editingWallet) return;
+                    const typeChanged = editWalletType !== editingWallet.type;
+                    updateAccount(editingWallet.id, {
+                      name: editWalletName.trim(),
+                      type: editWalletType,
+                      icon: typeChanged
+                        ? editWalletType === 'bank'
+                          ? 'Landmark'
+                          : editWalletType === 'ewallet'
+                          ? 'Smartphone'
+                          : 'Banknote'
+                        : editingWallet.icon,
+                      color: typeChanged
+                        ? editWalletType === 'bank'
+                          ? '#2563EB'
+                          : editWalletType === 'ewallet'
+                          ? '#06B6D4'
+                          : '#16A34A'
+                        : editingWallet.color,
+                    });
+                    showToast(`Dompet diperbarui menjadi "${editWalletName.trim()}"`);
+                    setEditingWallet(null);
+                  }}
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition active:scale-[0.98] ${primaryBtn}`}
+                >
+                  Simpan
+                </button>
               </div>
             </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setEditingWallet(null)}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold ${secondaryBtn}`}
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!editWalletName.trim() || !editingWallet) return;
-                  const typeChanged = editWalletType !== editingWallet.type;
-                  updateAccount(editingWallet.id, {
-                    name: editWalletName.trim(),
-                    type: editWalletType,
-                    icon: typeChanged
-                      ? editWalletType === 'bank'
-                        ? 'Landmark'
-                        : editWalletType === 'ewallet'
-                        ? 'Smartphone'
-                        : 'Banknote'
-                      : editingWallet.icon,
-                    color: typeChanged
-                      ? editWalletType === 'bank'
-                        ? '#2563EB'
-                        : editWalletType === 'ewallet'
-                        ? '#06B6D4'
-                        : '#16A34A'
-                      : editingWallet.color,
-                  });
-                  showToast(`Dompet diperbarui menjadi "${editWalletName.trim()}"`);
-                  setEditingWallet(null);
-                }}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold transition active:scale-[0.98] ${primaryBtn}`}
-              >
-                Simpan
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
 
       {/* Modal Hapus Dompet */}
       {deletingWallet && (
