@@ -11,14 +11,14 @@ export const TabBar: React.FC = () => {
   return (
     <div id="app-tabbar" className="fixed bottom-0 inset-x-0 z-40 flex justify-center pointer-events-none">
       <nav
-        style={{ paddingBottom: 'max(calc(env(safe-area-inset-bottom, 0px) - 14px), 0.375rem)' }}
+        style={{ paddingBottom: 'max(calc(env(safe-area-inset-bottom, 0px) - 22px), 0.25rem)' }}
         className={`w-full max-w-md ${isPinkTheme ? 'bg-[#FFF5F7]/95 border-pink-200/80 shadow-rose-200/20' : 'bg-white/95 dark:bg-[#0B0F19]/95 border-slate-200/70 dark:border-slate-800/80'} backdrop-blur-xl border-t md:border-x flex flex-col pointer-events-auto shadow-xs transition-all`}
       >
-        <div className="h-12 flex items-center justify-around px-2 relative">
+        <div className="h-11 flex items-center justify-around px-1.5 relative">
           {/* Beranda */}
           <button
             onClick={() => setActiveTab('beranda')}
-            className={`w-14 h-11 flex flex-col items-center justify-center transition-all ${
+            className={`w-14 h-10 flex flex-col items-center justify-center transition-all ${
               activeTab === 'beranda'
                 ? isPinkTheme ? 'text-rose-500 font-bold scale-105' : 'text-emerald-600 dark:text-emerald-400 font-semibold'
                 : isPinkTheme ? 'text-pink-400/80 hover:text-rose-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
@@ -38,7 +38,7 @@ export const TabBar: React.FC = () => {
           {/* Transaksi */}
           <button
             onClick={() => setActiveTab('transaksi')}
-            className={`w-14 h-11 flex flex-col items-center justify-center transition-all ${
+            className={`w-14 h-10 flex flex-col items-center justify-center transition-all ${
               activeTab === 'transaksi'
                 ? isPinkTheme ? 'text-rose-500 font-bold scale-105' : 'text-emerald-600 dark:text-emerald-400 font-semibold'
                 : isPinkTheme ? 'text-pink-400/80 hover:text-rose-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
@@ -66,7 +66,7 @@ export const TabBar: React.FC = () => {
           {/* Budget */}
           <button
             onClick={() => setActiveTab('budget')}
-            className={`w-14 h-11 flex flex-col items-center justify-center transition-all ${
+            className={`w-14 h-10 flex flex-col items-center justify-center transition-all ${
               activeTab === 'budget'
                 ? isPinkTheme ? 'text-rose-500 font-bold scale-105' : 'text-emerald-600 dark:text-emerald-400 font-semibold'
                 : isPinkTheme ? 'text-pink-400/80 hover:text-rose-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
@@ -79,7 +79,7 @@ export const TabBar: React.FC = () => {
           {/* Lainnya */}
           <button
             onClick={() => setActiveTab('lainnya')}
-            className={`w-14 h-11 flex flex-col items-center justify-center transition-all ${
+            className={`w-14 h-10 flex flex-col items-center justify-center transition-all ${
               activeTab === 'lainnya'
                 ? isPinkTheme ? 'text-rose-500 font-bold scale-105' : 'text-emerald-600 dark:text-emerald-400 font-semibold'
                 : isPinkTheme ? 'text-pink-400/80 hover:text-rose-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'

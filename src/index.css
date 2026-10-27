@@ -7,13 +7,13 @@
     padding-top: max(env(safe-area-inset-top, 0px), 0.75rem);
   }
   .pb-safe-bottom {
-    padding-bottom: max(calc(env(safe-area-inset-bottom, 0px) - 10px), 0.75rem);
+    padding-bottom: max(calc(env(safe-area-inset-bottom, 0px) - 16px), 0.5rem);
   }
   .pb-tabbar-clearance {
-    padding-bottom: calc(4.75rem + max(calc(env(safe-area-inset-bottom, 0px) - 14px), 0.375rem));
+    padding-bottom: calc(4rem + max(calc(env(safe-area-inset-bottom, 0px) - 22px), 0.25rem));
   }
   .bottom-safe-toast {
-    bottom: calc(4.25rem + max(calc(env(safe-area-inset-bottom, 0px) - 14px), 0.375rem));
+    bottom: calc(3.5rem + max(calc(env(safe-area-inset-bottom, 0px) - 22px), 0.25rem));
   }
   .scrollbar-none::-webkit-scrollbar {
     display: none;
