@@ -5,7 +5,6 @@ import { AppIcon } from '../common/IconHelper';
 import {
   parseVoiceInput,
   parseOCRText,
-  parseQRISCode,
   detectDuplicate,
   guessCategory,
   DEFAULT_TEMPLATES,
@@ -15,7 +14,6 @@ import {
   X,
   Mic,
   Camera,
-  QrCode,
   Edit3,
   Check,
   AlertCircle,
@@ -31,13 +29,11 @@ import {
 import { getEngineMode, setEngineMode, type ProcessingEngineMode } from '../../utils/aiMode';
 import { TxnType } from '../../types/index.ts';
 import { pickPhoto, downscaleImage, savePendingUpload } from '../../utils/cameraHelper';
-import { scanQRCodeFromDataUrl } from '../../utils/qrScanner';
 import { recognizeReceiptText } from '../../utils/ocr';
 import { VoiceRecorder, isVoiceRecordingSupported } from '../../utils/audioRecorder';
 import {
   getAIStatus,
   getStoredGeminiKey,
-  scanReceiptWithAI,
   transcribeVoiceWithAI,
   geminiErrorMessage,
   type AIStatus,
@@ -86,7 +82,7 @@ export const CatatModal: React.FC = () => {
     [categories, accounts]
   );
 
-  const [activeTab, setActiveTab] = useState<'manual' | 'voice' | 'ocr' | 'screenshot' | 'qr'>(
+  const [activeTab, setActiveTab] = useState<'manual' | 'voice' | 'ocr' | 'screenshot'>(
     catatInitialMode
   );
 
@@ -139,12 +135,6 @@ export const CatatModal: React.FC = () => {
     window.addEventListener('bb_engine_mode_changed', handler);
     return () => window.removeEventListener('bb_engine_mode_changed', handler);
   }, []);
-
-  // QRIS State
-  const [qrisCustomInput, setQrisCustomInput] = useState('');
-  const [qrisData, setQrisData] = useState<{ merchant: string; nmid?: string; city?: string; amount?: number } | null>(
-    null
-  );
 
   // Cek ketersediaan Gemini saat modal dibuka (server proxy atau kunci perangkat).
   useEffect(() => {
@@ -221,8 +211,6 @@ export const CatatModal: React.FC = () => {
       setOcrParsedResult(null);
       setOcrError(null);
       setOcrEngine(null);
-      setQrisCustomInput('');
-      setQrisData(null);
     }
   }, [isCatatOpen, catatInitialType]);
 
@@ -630,24 +618,13 @@ export const CatatModal: React.FC = () => {
         engine = 'tesseract';
       }
     } catch {
-      // Fallback ke contoh teks lokal di bawah.
-    }
-
-    if (!sample) {
-      const lowerName = filename.toLowerCase();
-      if (lowerName.includes('bca') || lowerName.includes('transfer') || lowerName.includes('tf')) {
-        sample = 'TRANSFER BERHASIL\n09 OKT 2026 14:32\nKe: Budi Santoso\nNominal: Rp 750.000\nNo. Ref: 88192301\nm-BCA';
-      } else if (lowerName.includes('gopay') || lowerName.includes('qris')) {
-        sample = 'PEMBAYARAN QRIS BERHASIL\nKopi Kenangan Senayan\nRp 35.000\n09 Okt 2026 10:15\nGoPay Saldo\nID: GP-882391';
-      } else {
-        sample = `STRUK BELANJA\n${filename.replace(/\.[^/.]+$/, '').toUpperCase()}\n09/10/2026 11:20\n1x Belanja Barang Rp 48.000\nTOTAL: Rp 48.000\nREF: STRUK-${Date.now().toString().slice(-6)}`;
-      }
+      // OCR gagal membaca teks
     }
 
     setOcrSampleText(sample);
     setOcrEditText(sample);
-    setOcrParsedResult(parseOCRText(sample));
-    setOcrEngine(engine);
+    setOcrParsedResult(sample ? parseOCRText(sample) : null);
+    setOcrEngine(sample ? engine : null);
     return { sample, engine };
   };
 
@@ -680,11 +657,11 @@ export const CatatModal: React.FC = () => {
     try {
       setOcrProgressText('Membaca nota on-device...');
       const local = await runLocalReceiptScan(compressed, filename);
-      showToast(
-        local.engine === 'tesseract'
-          ? 'Nota dibaca dengan OCR on-device'
-          : 'Foto dimuat dengan contoh teks lokal'
-      );
+      if (local.sample) {
+        showToast('Nota dibaca dengan OCR on-device');
+      } else {
+        showToast('Teks nota tidak terbaca jelas. Silakan ketik manual.');
+      }
     } finally {
       setIsOcrProcessing(false);
       setOcrProgressText('');
@@ -702,11 +679,11 @@ export const CatatModal: React.FC = () => {
     try {
       setOcrProgressText('Membaca ulang nota on-device...');
       const local = await runLocalReceiptScan(uploadedImageUrl, 'struk.jpg');
-      showToast(
-        local.engine === 'tesseract'
-          ? 'Nota berhasil dibaca ulang'
-          : 'Nota diproses dengan parser lokal'
-      );
+      if (local.sample) {
+        showToast('Nota berhasil dibaca ulang');
+      } else {
+        showToast('Teks nota tidak terbaca jelas. Silakan ketik manual.');
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Gagal memproses nota';
       setOcrError(message);
@@ -752,30 +729,6 @@ export const CatatModal: React.FC = () => {
       await processImagePhoto(photo);
     } else {
       document.getElementById('receipt-gallery-input')?.click();
-    }
-  };
-
-  const processQrisImageData = async (dataUrl: string) => {
-    savePendingUpload('qr');
-    const compressed = await downscaleImage(dataUrl);
-    setUploadedImageUrl(compressed);
-    const scanned = await scanQRCodeFromDataUrl(compressed);
-    if (scanned) {
-      handleProcessQrisPayload(scanned);
-      showToast('QR Code QRIS berhasil didekode');
-    } else {
-      handleProcessQrisPayload('00020101021226610014ID.LINKAJA.WWW0118936009110023451000201');
-      showToast('QR Code dibaca (mode otomatis)');
-    }
-  };
-
-  const handleNativeQRISGallery = async () => {
-    savePendingUpload('qr');
-    const photo = await pickPhoto('photos');
-    if (photo) {
-      await processQrisImageData(photo);
-    } else {
-      document.getElementById('qris-file-input')?.click();
     }
   };
 
@@ -832,44 +785,6 @@ export const CatatModal: React.FC = () => {
     }
   };
 
-  const handleProcessQrisPayload = (raw: string) => {
-    const qris = parseQRISCode(raw || '00020101021226610014ID.LINKAJA.WWW0118936009110023451000201');
-    setQrisData(qris);
-    showToast('Kode QRIS berhasil didekode');
-  };
-
-  const handleQrisFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async () => {
-      if (typeof reader.result === 'string') {
-        await processQrisImageData(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleSimulateScanQR = () => {
-    handleProcessQrisPayload('00020101021226610014ID.LINKAJA.WWW0118936009110023451000201');
-  };
-
-  const handleSaveQRIS = () => {
-    if (!qrisData) return;
-    addTransaction({
-      type: 'expense',
-      amount: qrisData.amount || 28000,
-      category_id: 'cat-makan',
-      account_id: 'acc-gopay',
-      merchant: qrisData.merchant,
-      note: `QRIS NMID: ${qrisData.nmid || '-'} (${qrisData.city || 'ID'})`,
-      source: 'qr',
-      confidence: 0.99,
-      status: 'confirmed',
-    });
-    closeCatat();
-  };
-
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-end justify-center">
       <div className={`${isPinkTheme ? 'bg-[#FFF5F7] border-pink-200 text-[#37131D]' : 'bg-white dark:bg-[#111827] border-slate-200 dark:border-slate-800'} w-full max-w-md rounded-t-[28px] shadow-2xl max-h-[90dvh] flex flex-col overflow-hidden animate-slide-up border-t`}>
@@ -894,8 +809,8 @@ export const CatatModal: React.FC = () => {
             </button>
           </div>
 
-          {/* Segmented Control 4 Mode Tabs (Apple iOS style) */}
-          <div className={`grid grid-cols-4 gap-1 mt-3 p-1 ${isPinkTheme ? 'bg-pink-100/70' : 'bg-slate-100 dark:bg-slate-800'} rounded-xl text-xs font-semibold`}>
+          {/* Segmented Control 3 Mode Tabs (Apple iOS style) */}
+          <div className={`grid grid-cols-3 gap-1 mt-3 p-1 ${isPinkTheme ? 'bg-pink-100/70' : 'bg-slate-100 dark:bg-slate-800'} rounded-xl text-xs font-semibold`}>
             <button
               onClick={() => setActiveTab('manual')}
               className={`py-1.5 rounded-lg transition flex items-center justify-center gap-1 ${
@@ -928,17 +843,6 @@ export const CatatModal: React.FC = () => {
             >
               <Camera className="w-3.5 h-3.5" />
               <span>Nota</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('qr')}
-              className={`py-1.5 rounded-lg transition flex items-center justify-center gap-1 ${
-                activeTab === 'qr'
-                  ? isPinkTheme ? 'bg-white text-rose-600 shadow-xs font-bold' : 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                  : isPinkTheme ? 'text-pink-600/70 hover:text-pink-900' : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <QrCode className="w-3.5 h-3.5" />
-              <span>QRIS</span>
             </button>
           </div>
         </div>
@@ -1238,11 +1142,7 @@ export const CatatModal: React.FC = () => {
                     ? 'Mengubah suara menjadi transaksi terstruktur'
                     : isRecording
                       ? `Ketuk lagi untuk berhenti (maks. ${MAX_RECORDING_SECONDS} detik)`
-                      : engineMode === 'local'
-                        ? 'Pengenalan suara on-device · 0 latensi · bebas kuota'
-                        : hasAI
-                          ? 'Rekaman diproses Gemini AI, tidak disimpan di server'
-                          : 'Tanpa internet · gunakan mic keyboard untuk dikte'}
+                      : 'Dikte suara on-device (Web Speech API) · atau gunakan mic keyboard'}
                 </div>
               </div>
 
@@ -1665,14 +1565,14 @@ export const CatatModal: React.FC = () => {
               )}
 
               {isOcrProcessing && (
-                <div className="p-3 rounded-2xl border border-fuchsia-200/70 dark:border-fuchsia-900/60 bg-fuchsia-50/70 dark:bg-fuchsia-950/30 flex items-center gap-3 text-left">
-                  <Loader2 className="w-5 h-5 animate-spin text-fuchsia-500 shrink-0" />
+                <div className="p-3 rounded-2xl border border-emerald-200/70 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/30 flex items-center gap-3 text-left">
+                  <Loader2 className="w-5 h-5 animate-spin text-emerald-600 shrink-0" />
                   <div>
                     <p className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                      {ocrProgressText || (engineMode === 'cloud' && hasAI ? 'Membaca nota dengan Gemini AI...' : 'Membaca nota dengan OCR on-device...')}
+                      {ocrProgressText || 'Membaca nota dengan OCR on-device...'}
                     </p>
                     <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                      Biasanya 3–8 detik. Hasil tetap bisa diedit sebelum disimpan.
+                      Biasanya 2–5 detik. Hasil tetap bisa diedit sebelum disimpan.
                     </p>
                   </div>
                 </div>
@@ -1684,7 +1584,7 @@ export const CatatModal: React.FC = () => {
                     <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] font-bold text-amber-700 dark:text-amber-300">
-                        Gemini AI belum berhasil
+                        OCR belum berhasil membaca teks
                       </p>
                       <p className="text-[10px] leading-relaxed text-amber-700/90 dark:text-amber-300/90 mt-0.5">
                         {ocrError}
@@ -1696,9 +1596,9 @@ export const CatatModal: React.FC = () => {
                             void handleRetryAIScan();
                           }}
                           disabled={!uploadedImageUrl}
-                          className="px-2.5 py-1.5 rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-[10px] font-bold active:scale-95 transition disabled:opacity-50"
+                          className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold active:scale-95 transition disabled:opacity-50"
                         >
-                          Coba AI Lagi
+                          Coba Pindai Ulang
                         </button>
                         <button
                           type="button"
@@ -1837,108 +1737,6 @@ export const CatatModal: React.FC = () => {
                         Pecah Kategori
                       </button>
                     )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ===================== MODE 4: QRIS (FR-19 to FR-21) ===================== */}
-          {activeTab === 'qr' && (
-            <div className="space-y-4 text-center py-2">
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Pindai QRIS merchant untuk mengambil nama toko dan NMID secara otomatis.
-              </p>
-
-              {/* Viewfinder with Real Photo Upload */}
-              <input
-                type="file"
-                id="qris-file-input"
-                accept="image/*"
-                className="hidden"
-                onChange={handleQrisFileChange}
-              />
-              <button
-                type="button"
-                onClick={handleNativeQRISGallery}
-                className="cursor-pointer block w-full focus:outline-none"
-              >
-                <div className="relative w-44 h-44 mx-auto bg-slate-900 rounded-2xl flex items-center justify-center overflow-hidden border border-slate-700 shadow-inner group hover:border-emerald-500 transition">
-                  {uploadedImageUrl && activeTab === 'qr' ? (
-                    <img src={uploadedImageUrl} alt="QRIS" className="w-full h-full object-cover" />
-                  ) : (
-                    <>
-                      <div className="absolute inset-4 border border-dashed border-white/40 rounded-xl flex items-center justify-center">
-                        <div className="w-full h-0.5 bg-emerald-400 animate-pulse"></div>
-                      </div>
-                      <QrCode className="w-14 h-14 text-white/30 group-hover:text-emerald-400 transition" />
-                    </>
-                  )}
-                </div>
-                <span className="text-[11px] text-slate-400 mt-1.5 block">
-                  Ketuk kotak untuk pilih screenshot QRIS dari galeri
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSimulateScanQR}
-                className="px-4 py-2.5 bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl shadow-xs transition active:scale-95 min-h-[44px]"
-              >
-                Gunakan Contoh QRIS Kopi Kenangan
-              </button>
-
-              {/* Paste QRIS payload input */}
-              <div className="text-left space-y-1 pt-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">
-                  Atau Tempel Teks/Kode QRIS (NMID / EMVCo):
-                </span>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={qrisCustomInput}
-                    onChange={e => setQrisCustomInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && qrisCustomInput.trim()) {
-                        handleProcessQrisPayload(qrisCustomInput);
-                      }
-                    }}
-                    placeholder="Contoh: ID102003881920 / EMVCo code..."
-                    className="flex-1 px-3 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-base sm:text-xs outline-none border border-transparent focus:border-slate-300 dark:focus:border-slate-700"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (qrisCustomInput.trim()) handleProcessQrisPayload(qrisCustomInput);
-                    }}
-                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold active:scale-95 transition"
-                  >
-                    Dekode
-                  </button>
-                </div>
-              </div>
-
-              {qrisData && (
-                <div className="bg-slate-50 dark:bg-slate-800/80 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 text-left space-y-2 text-xs">
-                  <div className="font-bold text-slate-900 dark:text-white text-sm">
-                    {qrisData.merchant}
-                  </div>
-                  <div className="text-slate-500">
-                    NMID: <span className="font-mono text-slate-800 dark:text-slate-200">{qrisData.nmid}</span> • Kota: {qrisData.city}
-                  </div>
-                  {qrisData.amount && (
-                    <div className="font-bold text-slate-900 dark:text-white text-sm tabular-nums">
-                      Nominal: {formatIDR(qrisData.amount)}
-                    </div>
-                  )}
-
-                  <div className="pt-1 pb-safe-bottom">
-                    <button
-                      onClick={handleSaveQRIS}
-                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl min-h-[44px] active:scale-95 transition shadow-sm"
-                    >
-                      Konfirmasi Simpan
-                    </button>
                   </div>
                 </div>
               )}

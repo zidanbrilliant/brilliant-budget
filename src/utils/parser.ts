@@ -507,25 +507,6 @@ export function parseOCRText(text: string): ParsedItem {
   };
 }
 
-// Simulasi Decode QR QRIS (FR-19, FR-20, FR-21)
-// Format standar EMVCo / QRIS Indonesia
-export function parseQRISCode(rawPayload: string): { merchant: string; nmid?: string; city?: string; amount?: number } {
-  // Bila format string simulasi atau payload
-  if (rawPayload.includes('000201') || rawPayload.toLowerCase().includes('qris')) {
-    return {
-      merchant: 'KOPI KENANGAN GRAND INDONESIA',
-      nmid: 'ID102003881920',
-      city: 'JAKARTA PUSAT',
-      amount: 28000,
-    };
-  }
-  return {
-    merchant: 'Merchant QRIS Nasional',
-    nmid: 'ID99823100234',
-    city: 'JAKARTA',
-  };
-}
-
 // Deteksi Duplikat (FR-26, FR-27, FR-28)
 // Kunci pasti: external_ref
 // Kunci kabur: rentang waktu ±10 menit + amount sama + account_id / merchant mirip

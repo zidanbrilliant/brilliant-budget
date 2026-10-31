@@ -4,7 +4,6 @@ import { db, initDatabase } from './db.ts';
 import {
   parseVoiceInput,
   parseOCRText,
-  parseQRISCode,
 } from '../src/utils/parser.ts';
 import { runAIStatus, runScanReceipt, runVoice } from './aiHandlers.ts';
 
@@ -573,12 +572,6 @@ app.post('/api/parse/sms', (req: Request, res: Response) => {
   res.json(result);
 });
 
-app.post('/api/parse/qris', (req: Request, res: Response) => {
-  const { payload } = req.body;
-  const result = parseQRISCode(payload || '');
-  res.json(result);
-});
-
 // ---------------- BACKUP & RESTORE (FR-55) ----------------
 app.get('/api/backup', (_req: Request, res: Response) => {
   const accounts = db.prepare('SELECT * FROM account').all();
@@ -637,4 +630,9 @@ app.post('/api/restore', (req: Request, res: Response) => {
   }
 
   res.json({ success: true, message: 'Data berhasil dipulihkan' });
+});
+
+app.post('/api/reset', (_req: Request, res: Response) => {
+  db.exec('DELETE FROM txn; DELETE FROM account; DELETE FROM category; DELETE FROM budget_line; DELETE FROM budget_plan; DELETE FROM recurring_rule; DELETE FROM goal;');
+  res.json({ success: true, message: 'Database reset berhasil' });
 });

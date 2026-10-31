@@ -1,49 +1,8 @@
 import assert from 'assert';
+import { calculateNextRun, processDueRecurringRules } from '../src/services/recurringScheduler.ts';
 
 // Test 2: Recurring Scheduler
 console.log('--- Testing Recurring Scheduler ---');
-function calculateNextRun(rule) {
-  const current = new Date(rule.next_run_at || Date.now());
-  const interval = rule.interval || 1;
-  switch (rule.frequency) {
-    case 'daily':
-      current.setDate(current.getDate() + interval);
-      break;
-    case 'monthly':
-      current.setMonth(current.getMonth() + interval);
-      break;
-  }
-  return current.getTime();
-}
-
-function processDueRecurringRules(rules, onExecute) {
-  const now = Date.now();
-  return rules.map(rule => {
-    if (!rule.is_active || !rule.next_run_at || rule.next_run_at > now) {
-      return rule;
-    }
-    onExecute({
-      type: rule.type,
-      amount: rule.amount,
-      account_id: rule.account_id,
-      category_id: rule.category_id,
-      merchant: rule.name,
-    });
-    const nextRun = calculateNextRun(rule);
-    let remainingTenor = rule.remaining_tenor;
-    let isActive = true;
-    if (!rule.is_subscription && typeof remainingTenor === 'number') {
-      remainingTenor -= 1;
-      if (remainingTenor <= 0) isActive = false;
-    }
-    return {
-      ...rule,
-      next_run_at: nextRun,
-      remaining_tenor: remainingTenor,
-      is_active: isActive,
-    };
-  });
-}
 
 const executed = [];
 const rules = [

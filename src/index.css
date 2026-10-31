@@ -80,6 +80,20 @@ html.ios-nav-gap .tabbar-safe-bottom {
   padding-bottom: 0 !important;
 }
 
+html.ios-nav-gap .pb-tabbar-clearance {
+  padding-bottom: 4.75rem !important;
+}
+
+html.ios-nav-gap .bottom-safe-toast {
+  bottom: 4.75rem !important;
+}
+
+body.modal-open {
+  overflow: hidden !important;
+  touch-action: none;
+  -webkit-overflow-scrolling: auto;
+}
+
 html.ios-nav-gap #app-tabbar nav {
   background-color: var(--nav-solid-bg) !important;
   box-shadow: none !important;

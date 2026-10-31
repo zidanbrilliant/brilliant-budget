@@ -20,7 +20,7 @@ export const TabBar: React.FC = () => {
             className={`w-14 h-12 flex flex-col items-center justify-center transition-all ${
               activeTab === 'beranda'
                 ? isPinkTheme ? 'text-rose-500 font-bold scale-105' : 'text-emerald-600 dark:text-emerald-400 font-semibold'
-                : isPinkTheme ? 'text-pink-400/80 hover:text-rose-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
+                : isPinkTheme ? 'text-[#884B5C] hover:text-rose-600' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
             }`}
           >
             <div className="relative">
@@ -40,7 +40,7 @@ export const TabBar: React.FC = () => {
             className={`w-14 h-12 flex flex-col items-center justify-center transition-all ${
               activeTab === 'transaksi'
                 ? isPinkTheme ? 'text-rose-500 font-bold scale-105' : 'text-emerald-600 dark:text-emerald-400 font-semibold'
-                : isPinkTheme ? 'text-pink-400/80 hover:text-rose-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
+                : isPinkTheme ? 'text-[#884B5C] hover:text-rose-600' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
             }`}
           >
             <ListFilter className="w-5 h-5 stroke-[2.2]" />
@@ -68,7 +68,7 @@ export const TabBar: React.FC = () => {
             className={`w-14 h-12 flex flex-col items-center justify-center transition-all ${
               activeTab === 'budget'
                 ? isPinkTheme ? 'text-rose-500 font-bold scale-105' : 'text-emerald-600 dark:text-emerald-400 font-semibold'
-                : isPinkTheme ? 'text-pink-400/80 hover:text-rose-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
+                : isPinkTheme ? 'text-[#884B5C] hover:text-rose-600' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
             }`}
           >
             <PieChart className="w-5 h-5 stroke-[2.2]" />
@@ -81,7 +81,7 @@ export const TabBar: React.FC = () => {
             className={`w-14 h-12 flex flex-col items-center justify-center transition-all ${
               activeTab === 'lainnya'
                 ? isPinkTheme ? 'text-rose-500 font-bold scale-105' : 'text-emerald-600 dark:text-emerald-400 font-semibold'
-                : isPinkTheme ? 'text-pink-400/80 hover:text-rose-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
+                : isPinkTheme ? 'text-[#884B5C] hover:text-rose-600' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
             }`}
           >
             <MoreHorizontal className="w-5 h-5 stroke-[2.2]" />

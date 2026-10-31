@@ -118,7 +118,7 @@ export const OnboardingModal: React.FC = () => {
               Selamat Datang di Brilliant Budget
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              Aplikasi keuangan pribadi <strong>100% offline</strong>. Seluruh data tersimpan aman
+              Aplikasi keuangan pribadi <strong>offline-first</strong>. Seluruh data tersimpan
               di perangkat Anda tanpa server dan tanpa pelacakan luar.
             </p>
           </div>

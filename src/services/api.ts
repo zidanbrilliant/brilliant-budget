@@ -109,6 +109,7 @@ export const api = {
   contributeGoal: (id: string, amount: number) => req<Goal>(`/goals/${id}/contribute`, { method: 'POST', body: JSON.stringify({ amount }) }),
   exportBackup: () => req<any>('/backup'),
   restoreBackup: (data: any) => req<any>('/restore', { method: 'POST', body: JSON.stringify(data) }),
+  resetData: () => req<{ success: boolean }>('/reset', { method: 'POST' }),
 
   // Gemini AI (server proxy). Kunci API tetap di server; klien tidak pernah menerimanya.
   getAIStatus: () => req<AIStatusResponse>('/ai/status', undefined, 6000),

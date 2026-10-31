@@ -247,4 +247,23 @@ assert.strictEqual(
 global.fetch = originalFetch;
 console.log('   ✓ Config sheet v2, version gate, dan sanitasi terverifikasi');
 
+// ================= Phase D: Tombstone Propagation & Deletion Template =================
+assert(
+  GOOGLE_APPS_SCRIPT_TEMPLATE.includes("r.action === 'delete'"),
+  'Template skrip harus memiliki penanganan action === delete'
+);
+assert(
+  GOOGLE_APPS_SCRIPT_TEMPLATE.includes('sheet.deleteRow(i + 1)'),
+  'Template skrip harus menghapus baris dari bawah ke atas saat action delete'
+);
+
+// Test mergeSheetRows skips incoming action: 'delete' rows
+const rowsWithDelete = [
+  { id: 'txn-del-1', date: '2026-10-26 12:00:00', type: 'expense', category: 'Makan', amount: 20000, account: 'BCA', note: '', source: 'sheet', action: 'delete' }
+];
+const resDelete = mergeSheetRows([], rowsWithDelete, mockCategories, mockAccounts);
+assert.strictEqual(resDelete.addedCount, 0, 'Incoming row with action: delete must not be added');
+
+console.log('   ✓ Phase D tombstone propagation & Apps Script deletion handler terverifikasi');
+
 console.log('=== SEMUA PENGUJIAN GOOGLE SHEETS LULUS ===');

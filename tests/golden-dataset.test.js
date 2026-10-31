@@ -4,7 +4,6 @@ import {
   guessCategory,
   parseVoiceInput,
   parseOCRText,
-  parseQRISCode,
   detectDuplicate,
 } from '../src/utils/parser.ts';
 import { db, initDatabase } from '../server/db.ts';
@@ -111,16 +110,8 @@ assert.strictEqual(parsedStruk.external_ref, 'IND-88192');
 assert(parsedStruk.items && parsedStruk.items.length >= 2, 'Harus mengekstrak rincian item struk (FR-13, FR-16)');
 console.log('   ✓ Template OCR & ekstraksi rincian item struk lulus.');
 
-// ================= 4. QRIS Decoding (FR-19, 20) =================
-console.log('4. Menguji Dekode QR QRIS Nasional...');
-const qris = parseQRISCode('00020101021226610014ID.LINKAJA.WWW0118936009110023451000201');
-assert.strictEqual(qris.merchant, 'KOPI KENANGAN GRAND INDONESIA');
-assert.strictEqual(qris.nmid, 'ID102003881920');
-assert.strictEqual(qris.amount, 28000);
-console.log('   ✓ Dekode QRIS EMVCo lulus.');
-
-// ================= 5. Logika Deteksi Duplikat (FR-26, 27, 28) =================
-console.log('5. Menguji Deteksi Duplikat (Exact Ref & Fuzzy 10 Menit)...');
+// ================= 4. Logika Deteksi Duplikat (FR-26, 27, 28) =================
+console.log('4. Menguji Deteksi Duplikat (Exact Ref & Fuzzy 10 Menit)...');
 const testTxns = [
   {
     id: 't-dup-1',

@@ -34,6 +34,7 @@ import {
   setLastPullTime,
   isConfigSyncEnabled,
   setConfigSyncEnabled as persistConfigSyncEnabled,
+  clearSheetSyncState,
   pullConfigFromSheet,
   pushConfigToSheet,
   type ConfigSnapshot,
@@ -58,9 +59,9 @@ interface AppContextType {
   activeTab: 'beranda' | 'transaksi' | 'catat' | 'budget' | 'lainnya';
   setActiveTab: (tab: 'beranda' | 'transaksi' | 'catat' | 'budget' | 'lainnya') => void;
   isCatatOpen: boolean;
-  openCatat: (mode?: 'manual' | 'voice' | 'ocr' | 'screenshot' | 'qr', initialType?: TxnType) => void;
+  openCatat: (mode?: 'manual' | 'voice' | 'ocr' | 'screenshot', initialType?: TxnType) => void;
   closeCatat: () => void;
-  catatInitialMode: 'manual' | 'voice' | 'ocr' | 'screenshot' | 'qr';
+  catatInitialMode: 'manual' | 'voice' | 'ocr' | 'screenshot';
   catatInitialType: TxnType;
   toast: ToastAction | null;
   showToast: (message: string, undo?: () => void) => void;
@@ -109,6 +110,8 @@ interface AppContextType {
   exportBackupData: () => string;
   importBackupData: (jsonStr: string) => boolean;
   resetAllData: () => void;
+  storageWarning: string | null;
+  dismissStorageWarning: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -141,6 +144,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return INITIAL_TRANSACTIONS;
     }
   });
+
+  const transactionsRef = React.useRef<Txn[]>(transactions);
+  useEffect(() => {
+    transactionsRef.current = transactions;
+  }, [transactions]);
 
   const [budget, setBudget] = useState<BudgetPlan>(() => {
     try {
@@ -181,13 +189,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // UI State
   const [activeTab, setActiveTab] = useState<'beranda' | 'transaksi' | 'catat' | 'budget' | 'lainnya'>('beranda');
   const [isCatatOpen, setIsCatatOpen] = useState(false);
-  const [catatInitialMode, setCatatInitialMode] = useState<'manual' | 'voice' | 'ocr' | 'screenshot' | 'qr'>('manual');
+  const [catatInitialMode, setCatatInitialMode] = useState<'manual' | 'voice' | 'ocr' | 'screenshot'>('manual');
   const [catatInitialType, setCatatInitialType] = useState<TxnType>('expense');
   const [toast, setToast] = useState<ToastAction | null>(null);
+  const [storageWarning, setStorageWarning] = useState<string | null>(null);
+  const dismissStorageWarning = () => setStorageWarning(null);
   const [isBackendConnected, setIsBackendConnected] = useState(false);
   const [configSyncEnabled, setConfigSyncEnabledState] = useState<boolean>(() =>
     isConfigSyncEnabled()
   );
+
+  // Sovereignty flag: treat local storage as source of truth on initial boot
+  const [hasLocalStateOnMount] = useState<boolean>(() => {
+    try {
+      return (
+        localStorage.getItem(STORAGE_KEY + '_txns') !== null ||
+        localStorage.getItem(STORAGE_KEY + '_accounts') !== null ||
+        localStorage.getItem(STORAGE_KEY + '_categories') !== null ||
+        localStorage.getItem(STORAGE_KEY + '_init') !== null
+      );
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY + '_init', '1');
+    } catch {}
+  }, []);
 
   // Sync to Backend if available (with offline fallback)
   useEffect(() => {
@@ -208,12 +238,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             api.getGoals().catch(() => null),
           ]);
 
-          if (bAccounts && bAccounts.length) setAccounts(bAccounts);
-          if (bCategories && bCategories.length) setCategories(bCategories);
-          if (bTxns && bTxns.length) setTransactions(bTxns);
-          if (bBudget) setBudget(bBudget);
-          if (bRecurring) setRecurring(bRecurring);
-          if (bGoals) setGoals(bGoals);
+          // Safeguard: Backend adalah mirror/dev server opsional.
+          // Jika penyimpanan lokal sudah terinisialisasi, data lokal adalah sovereign.
+          if (!hasLocalStateOnMount) {
+            if (bAccounts && bAccounts.length) setAccounts(bAccounts);
+            if (bCategories && bCategories.length) setCategories(bCategories);
+            if (bTxns && bTxns.length) setTransactions(bTxns);
+            if (bBudget) setBudget(bBudget);
+            if (bRecurring) setRecurring(bRecurring);
+            if (bGoals) setGoals(bGoals);
+          }
         }
       } catch {
         // Fallback silently to localStorage
@@ -224,7 +258,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [hasLocalStateOnMount]);
 
   // Seamless 2-way Google Sheets sync
   const isSyncingFromSheet = React.useRef(false);
@@ -470,27 +504,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [categories, accounts]);
 
+  // Helper penyimpan aman (tahan QuotaExceededError)
+  const safeSetStorage = (key: string, value: unknown) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (err: any) {
+      const isQuota =
+        err?.name === 'QuotaExceededError' ||
+        err?.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+        err?.code === 22 ||
+        err?.code === 1014;
+      if (isQuota) {
+        setStorageWarning(
+          'Penyimpanan browser penuh. Sebagian data terbaru mungkin belum tersimpan secara persisten. Silakan ekspor cadangan data Anda.'
+        );
+      }
+      console.warn(`Penyimpanan lokal penuh atau gagal untuk key "${key}":`, err);
+    }
+  };
+
   // Sync to localStorage as offline mirror
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY + '_accounts', JSON.stringify(accounts));
+    safeSetStorage(STORAGE_KEY + '_accounts', accounts);
   }, [accounts]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY + '_categories', JSON.stringify(categories));
+    safeSetStorage(STORAGE_KEY + '_categories', categories);
   }, [categories]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY + '_txns', JSON.stringify(transactions));
+    safeSetStorage(STORAGE_KEY + '_txns', transactions);
   }, [transactions]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY + '_budget', JSON.stringify(budget));
+    safeSetStorage(STORAGE_KEY + '_budget', budget);
   }, [budget]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY + '_recurring', JSON.stringify(recurring));
+    safeSetStorage(STORAGE_KEY + '_recurring', recurring);
   }, [recurring]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY + '_goals', JSON.stringify(goals));
+    safeSetStorage(STORAGE_KEY + '_goals', goals);
   }, [goals]);
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY + '_settings', JSON.stringify(settings));
+    safeSetStorage(STORAGE_KEY + '_settings', settings);
     if (settings.theme === 'dark') {
       document.documentElement.classList.add('dark');
       document.documentElement.classList.remove('theme-light');
@@ -518,7 +571,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const clearToast = () => setToast(null);
 
   const openCatat = (
-    mode: 'manual' | 'voice' | 'ocr' | 'screenshot' | 'qr' = 'manual',
+    mode: 'manual' | 'voice' | 'ocr' | 'screenshot' = 'manual',
     initialType: TxnType = 'expense'
   ) => {
     setCatatInitialMode(mode);
@@ -606,6 +659,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Transactions Actions
   const addTransaction = (data: Partial<Txn>): Txn => {
+    // Idempotency: jangan buat duplikat jika external_ref sudah tercatat
+    if (data.external_ref) {
+      const existing = transactionsRef.current.find(t => t.external_ref === data.external_ref);
+      if (existing) {
+        return existing;
+      }
+    }
+
     const newTxn: Txn = {
       id: data.id || 'txn-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
       type: data.type || 'expense',
@@ -627,7 +688,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updated_at: Date.now(),
     };
 
-    setTransactions(prev => [newTxn, ...prev]);
+    setTransactions(prev => {
+      if (data.external_ref && prev.some(t => t.external_ref === data.external_ref)) {
+        return prev;
+      }
+      const updated = [newTxn, ...prev];
+      transactionsRef.current = updated;
+      return updated;
+    });
     showToast(newTxn.status === 'draft' ? 'Disimpan ke Inbox Draft' : 'Transaksi berhasil dicatat');
 
     // Async sync to backend
@@ -694,14 +762,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const target = transactions.find(t => t.id === id);
     if (!target) return;
 
-    setTransactions(prev => prev.filter(t => t.id !== id));
+    setTransactions(prev =>
+      prev.map(t => (t.id === id ? { ...t, deleted_at: Date.now(), updated_at: Date.now() } : t))
+    );
     if (isBackendConnected) {
       api.deleteTransaction(id).catch(console.error);
     }
 
+    if (target.status === 'confirmed') {
+      const dateStr = new Date(target.occurred_at).toLocaleString('sv-SE');
+      syncTransactionToSheet({
+        id: target.id,
+        date: dateStr,
+        type: target.type,
+        category: '',
+        amount: target.amount,
+        account: '',
+        note: '',
+        source: target.source,
+        action: 'delete',
+      }).catch(console.error);
+    }
+
     showToast('Transaksi dihapus', () => {
-      setTransactions(prev => [target, ...prev]);
+      setTransactions(prev =>
+        prev.map(t => (t.id === id ? { ...t, deleted_at: null, updated_at: Date.now() } : t))
+      );
       if (isBackendConnected) api.createTransaction(target).catch(console.error);
+      if (target.status === 'confirmed') {
+        const catName = categories.find(c => c.id === target.category_id)?.name || 'Lainnya';
+        const accName = accounts.find(a => a.id === target.account_id)?.name || 'Dompet';
+        const dateStr = new Date(target.occurred_at).toLocaleString('sv-SE');
+        syncTransactionToSheet({
+          id: target.id,
+          date: dateStr,
+          type: target.type,
+          category: catName,
+          amount: target.amount,
+          account: accName,
+          note: target.merchant ? `${target.merchant} ${target.note ? `(${target.note})` : ''}`.trim() : (target.note || '-'),
+          source: target.source,
+          action: 'save',
+        }).catch(console.error);
+      }
     });
   };
 
@@ -975,9 +1078,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const runScheduler = () => {
       setRecurring(prevRules => {
-        return processDueRecurringRules(prevRules, txnData => {
-          addTransaction(txnData);
-        });
+        return processDueRecurringRules(
+          prevRules,
+          txnData => {
+            addTransaction(txnData);
+          },
+          transactionsRef.current
+        );
       });
     };
 
@@ -1064,20 +1171,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const importBackupData = (jsonStr: string): boolean => {
     try {
+      if (typeof jsonStr !== 'string' || jsonStr.length > 15 * 1024 * 1024) return false;
       const data = JSON.parse(jsonStr);
-      if (!data.accounts || !data.transactions) return false;
+      if (!data || typeof data !== 'object') return false;
+
+      // Validasi ketat schema agar data rusak/malformed ditolak
+      if (!Array.isArray(data.accounts) || !Array.isArray(data.transactions)) {
+        return false;
+      }
+
+      const seenAccIds = new Set<string>();
+      const isValidAccounts = data.accounts.every((a: any) => {
+        if (!a || typeof a.id !== 'string' || !a.id.trim() || typeof a.name !== 'string' || !a.name.trim()) return false;
+        if (seenAccIds.has(a.id)) return false;
+        seenAccIds.add(a.id);
+        return true;
+      });
+
+      const seenTxnIds = new Set<string>();
+      const isValidTxns = data.transactions.every((t: any) => {
+        if (
+          !t ||
+          typeof t.id !== 'string' ||
+          !t.id.trim() ||
+          typeof t.amount !== 'number' ||
+          !Number.isFinite(t.amount) ||
+          t.amount <= 0
+        ) {
+          return false;
+        }
+        if (seenTxnIds.has(t.id)) return false;
+        seenTxnIds.add(t.id);
+        return true;
+      });
+
+      if (!isValidAccounts || !isValidTxns) {
+        return false;
+      }
+
+      // Snapshot untuk opsi pembatalan (Undo)
+      const previousSnapshot = exportBackupData();
+      try {
+        localStorage.setItem('bb_backup_undo_snapshot', previousSnapshot);
+      } catch {}
+
       if (data.accounts) setAccounts(data.accounts);
-      if (data.categories) setCategories(data.categories);
+      if (Array.isArray(data.categories)) setCategories(data.categories);
       if (data.transactions) setTransactions(data.transactions);
-      if (data.budget) setBudget(data.budget);
-      if (data.recurring) setRecurring(data.recurring);
-      if (data.goals) setGoals(data.goals);
-      if (data.settings) setSettings(data.settings);
+      if (data.budget && typeof data.budget === 'object') setBudget(data.budget);
+      if (Array.isArray(data.recurring)) setRecurring(data.recurring);
+      if (Array.isArray(data.goals)) setGoals(data.goals);
+      if (data.settings && typeof data.settings === 'object') setSettings(data.settings);
 
       if (isBackendConnected) {
         api.restoreBackup(data).catch(console.error);
       }
-      showToast('Data berhasil dipulihkan dari file backup!');
+
+      showToast('Data berhasil dipulihkan dari cadangan', () => {
+        importBackupData(previousSnapshot);
+      });
       return true;
     } catch {
       return false;
@@ -1085,9 +1237,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetAllData = () => {
-    // Jangan biarkan reset lokal menimpa config di Sheets secara otomatis.
+    // 1. Matikan config sync dan bersihkan antrean Sheets
     setConfigSyncEnabled(false);
+    clearSheetSyncState();
     lastConfigPushSignature.current = '';
+
+    // 2. Bersihkan local storage keys
+    try {
+      localStorage.removeItem(STORAGE_KEY + '_accounts');
+      localStorage.removeItem(STORAGE_KEY + '_categories');
+      localStorage.removeItem(STORAGE_KEY + '_txns');
+      localStorage.removeItem(STORAGE_KEY + '_budget');
+      localStorage.removeItem(STORAGE_KEY + '_recurring');
+      localStorage.removeItem(STORAGE_KEY + '_goals');
+      localStorage.removeItem(STORAGE_KEY + '_settings');
+      localStorage.removeItem('bb_backup_undo_snapshot');
+      localStorage.setItem(STORAGE_KEY + '_init', '1');
+    } catch {}
+
+    // 3. Reset state memori ke nilai awal
     setAccounts(INITIAL_ACCOUNTS);
     setCategories(INITIAL_CATEGORIES);
     setTransactions(INITIAL_TRANSACTIONS);
@@ -1095,7 +1263,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setRecurring(INITIAL_RECURRING);
     setGoals(INITIAL_GOALS);
     setSettings(INITIAL_SETTINGS);
-    showToast('Data dikembalikan ke setelan awal');
+
+    // 4. Bersihkan database backend mirror jika terkoneksi
+    if (isBackendConnected) {
+      api.resetData().catch(console.error);
+    }
+
+    showToast('Semua data berhasil direset ke setelan awal');
   };
 
   return (
@@ -1154,6 +1328,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         exportBackupData,
         importBackupData,
         resetAllData,
+        storageWarning,
+        dismissStorageWarning,
       }}
     >
       {children}

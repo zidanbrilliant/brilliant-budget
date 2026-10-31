@@ -83,10 +83,10 @@ export const LainnyaView: React.FC = () => {
     dompet: { title: 'Dompet & Rekening', subtitle: 'Kelola saldo dan transfer antar dompet' },
     kategori: { title: 'Kategori Transaksi', subtitle: 'Atur kategori pengeluaran dan pemasukan' },
     laporan: { title: 'Laporan & Wawasan', subtitle: 'Ringkasan dan analisis keuanganmu' },
-    backup: { title: 'Cadangan & Pemulihan', subtitle: 'Simpan data ke file lokal yang aman' },
+    backup: { title: 'Cadangan & Pemulihan', subtitle: 'Ekspor atau impor file cadangan JSON lokal' },
     sms_simulator: { title: 'Uji Parser SMS', subtitle: 'Simulasi otomatisasi dari teks SMS bank' },
     googlesheets: { title: 'Google Sheets', subtitle: 'Sinkronkan transaksi & konfigurasi' },
-    ai: { title: 'Gemini AI', subtitle: 'Input suara & scan nota dengan AI gratis' },
+    ai: { title: 'Gemini AI', subtitle: 'Input suara dengan AI Gemini (opsional)' },
   };
   const activeMeta = activeSection === 'menu' ? null : sectionMeta[activeSection];
   const primaryBtn = isPinkTheme
@@ -624,7 +624,7 @@ export const LainnyaView: React.FC = () => {
 
               <div className="p-3.5 flex items-center justify-between">
                 <span className="font-medium text-slate-700 dark:text-slate-300">Privasi Server</span>
-                <span className={`font-bold ${isPinkTheme ? 'text-pink-600' : 'text-emerald-600'}`}>100% On-Device</span>
+                <span className={`font-bold ${isPinkTheme ? 'text-pink-600' : 'text-emerald-600'}`}>Offline-First (Opsional Cloud)</span>
               </div>
               <div className="p-3.5 flex items-center justify-between">
                 <span className="font-medium text-slate-700 dark:text-slate-300">Mata Uang</span>
@@ -1039,7 +1039,7 @@ export const LainnyaView: React.FC = () => {
           <div className="bg-white dark:bg-[#151E2E] p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 space-y-3 text-xs">
             <div className={`font-bold text-sm ${isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'}`}>File Cadangan Lokal (.catatbak)</div>
             <p className="text-slate-400 leading-relaxed">
-              Semua data disimpan di file lokal perangkat Anda. Anda dapat mencadangkan atau memulihkannya kapan saja.
+              Seluruh data diekspor dalam format JSON lokal tanpa enkripsi. Simpan file cadangan ini di folder perangkat yang aman.
             </p>
             <div className="flex gap-2 pt-1">
               <button

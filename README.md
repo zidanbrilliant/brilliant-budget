@@ -1,6 +1,6 @@
-# Brilliant Budget (PWA + Gemini AI + Google Sheets Sync)
+# Brilliant Budget (PWA Offline-First + Google Sheets Sync)
 
-Aplikasi pencatatan keuangan pribadi offline-first, cepat, dengan input suara & scan nota berbasis Gemini AI gratis, serta sinkronisasi otomatis ke Google Sheets tanpa biaya server.
+Aplikasi pencatatan keuangan pribadi offline-first, cepat, dengan penyimpanan data lokal di perangkat, OCR nota & dikte suara lokal on-device, serta sinkronisasi otomatis ke Google Sheets.
 
 ---
 
@@ -12,16 +12,15 @@ Aplikasi pencatatan keuangan pribadi offline-first, cepat, dengan input suara & 
 
 ---
 
-## 2. Aktifkan Gemini AI (Gratis)
+## 2. Aktifkan Gemini AI (Opsional)
 
-Fitur **input suara** dan **scan nota** memakai Gemini Flash gratis. Ada dua cara mengaktifkannya.
+Fitur **input suara** memakai Gemini Flash gratis (opsional). Scan nota diproses langsung secara lokal on-device menggunakan OCR (Tesseract.js). Ada dua cara mengaktifkan Gemini untuk suara.
 
 ### Cara A — Environment variable di Vercel (disarankan)
 1. Buka [Google AI Studio](https://aistudio.google.com/app/apikey), login, lalu klik **Create API key**.
 2. Buka project di Vercel → **Settings > Environment Variables**.
 3. Tambahkan:
    - `GEMINI_API_KEY` = kunci API Anda
-   - `GEMINI_MODEL` = `gemini-3.8-flash` (opsional; model scan nota)
    - `GEMINI_VOICE_MODEL` = `gemini-3.6-flash` (opsional; model input suara)
 4. Klik **Save**, lalu **Redeploy** project.
 
@@ -33,26 +32,92 @@ Dengan cara ini kunci tetap di server. Browser hanya memanggil `/api/ai/*`, dan 
 3. Kunci hanya disimpan di `localStorage` perangkat dan dikirim langsung ke Google, bukan ke server aplikasi.
 
 ### Cara kerja & fallback
-- **Scan nota**: model utama `gemini-3.8-flash`, fallback otomatis ke `gemini-3.6-flash` lalu `gemini-3.5-flash`.
-- **Input suara**: model utama `gemini-3.6-flash` (paling responsif untuk audio), fallback ke `gemini-3.5-flash` lalu `gemini-3.8-flash`.
-- **Suara**: rekaman diubah menjadi WAV mono 16 kHz, lalu ditranskripsi dan dipecah menjadi transaksi terstruktur (nominal, merchant, kategori, dompet, tanggal).
-- **Nota**: foto dikecilkan ke maksimal 1600 px, lalu Gemini Vision mengekstrak total akhir, merchant, tanggal, nomor referensi, dan rincian item.
-- Jika AI gagal atau kuota habis, aplikasi otomatis memakai **parser lokal** dan **OCR on-device (Tesseract)**. Input manual tetap selalu tersedia.
-- Kuota gratis Gemini Flash cukup untuk pemakaian pribadi harian. Jika kuota habis, tunggu beberapa saat atau gunakan fallback lokal.
+- **Input suara**: model utama `gemini-3.6-flash` (responsif untuk audio bahasa Indonesia), fallback ke `gemini-3.5-flash` lalu `gemini-3.8-flash`. Rekaman diubah menjadi audio lalu ditranskripsi dan dipetakan menjadi transaksi terstruktur.
+- **Scan nota**: diproses langsung di peramban secara lokal dengan Tesseract OCR on-device tanpa mengirim foto ke cloud. Hasil pembacaan nota dapat disunting langsung sebelum disimpan.
+- Jika Gemini tidak aktif atau kuota habis, input suara tetap dapat memakai Web Speech API peramban, dan input manual selalu tersedia.
 
 ---
 
 ## 3. Setup Auto-Sync Google Sheets (Sinkronisasi 2 Arah Laptop & HP)
 1. Buat Spreadsheet baru di Google Drive Anda.
 2. Buka menu **Extensions (Ekstensi) > Apps Script**.
-3. Hapus kode bawaan dan tempel kode berikut (mendukung simpan dan tarik data real-time):
+3. Hapus kode bawaan dan tempel kode skrip v2 berikut (mendukung transaksi dan lembar Config):
    ```javascript
+   function json_(payload) {
+     return ContentService.createTextOutput(JSON.stringify(payload))
+       .setMimeType(ContentService.MimeType.JSON);
+   }
+
+   function getTransactionsSheet_() {
+     var ss = SpreadsheetApp.getActiveSpreadsheet();
+     var named = ss.getSheetByName('Transaksi');
+     if (named) return named;
+     var sheets = ss.getSheets();
+     for (var i = 0; i < sheets.length; i++) {
+       var sheet = sheets[i];
+       if (sheet.getName() === 'Config') continue;
+       var firstCell = String(sheet.getRange(1, 1).getValue() || '').trim().toLowerCase();
+       if (firstCell === 'id' || firstCell === 'tanggal' || firstCell === 'date') return sheet;
+     }
+     for (var j = 0; j < sheets.length; j++) {
+       if (sheets[j].getName() !== 'Config') return sheets[j];
+     }
+     return ss.insertSheet('Transaksi');
+   }
+
    function doGet(e) {
-     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+     var action = e && e.parameter ? String(e.parameter.action || '') : '';
+     if (action === 'config') return getConfig_();
+     if (action === 'version') return json_({ status: 'ok', version: 2 });
+     return getTransactions_();
+   }
+
+   function getConfig_() {
+     var ss = SpreadsheetApp.getActiveSpreadsheet();
+     var sheet = ss.getSheetByName('Config');
+     if (!sheet || sheet.getLastRow() < 2) {
+       return json_({ status: 'ok', version: 2, config: null, updated_at: 0 });
+     }
+
+     var values = sheet.getDataRange().getValues();
+     var map = {};
+     for (var i = 1; i < values.length; i++) {
+       var key = String(values[i][0] || '').trim().toLowerCase();
+       if (key) map[key] = values[i][1];
+     }
+
+     function parseKey(key, fallback) {
+       try {
+         var raw = map[key];
+         if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
+         return JSON.parse(String(raw));
+       } catch (err) {
+         return fallback;
+       }
+     }
+
+     var config = {
+       accounts: parseKey('accounts', []),
+       categories: parseKey('categories', []),
+       budget: parseKey('budget', null),
+       recurring: parseKey('recurring', []),
+       goals: parseKey('goals', []),
+       settings: parseKey('settings', null)
+     };
+
+     return json_({
+       status: 'ok',
+       version: 2,
+       config: config,
+       updated_at: Number(map['updated_at']) || 0
+     });
+   }
+
+   function getTransactions_() {
+     var sheet = getTransactionsSheet_();
      var values = sheet.getDataRange().getValues();
      if (!values || values.length <= 1) {
-       return ContentService.createTextOutput(JSON.stringify({ status: 'ok', data: [] }))
-         .setMimeType(ContentService.MimeType.JSON);
+       return json_({ status: 'ok', version: 2, data: [] });
      }
      var header = values[0].map(function(h) { return String(h || '').trim().toLowerCase(); });
      var hasId = header[0] === 'id';
@@ -84,30 +149,85 @@ Dengan cara ini kunci tetap di server. Browser hanya memanggil `/api/ai/*`, dan 
        });
      }
 
-     return ContentService.createTextOutput(JSON.stringify({ status: 'ok', data: rows }))
-       .setMimeType(ContentService.MimeType.JSON);
+     return json_({ status: 'ok', version: 2, data: rows });
    }
 
    function doPost(e) {
-     var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+     var data = JSON.parse(e.postData.contents);
+     if (data && data.action === 'config') {
+       return saveConfig_(data);
+     }
+     return saveTransactions_(data);
+   }
+
+   function saveConfig_(data) {
+     var ss = SpreadsheetApp.getActiveSpreadsheet();
+     var sheet = ss.getSheetByName('Config');
+     if (!sheet) sheet = ss.insertSheet('Config');
+
+     var config = data.config || {};
+     var rows = [
+       ['Key', 'Value'],
+       ['accounts', JSON.stringify(config.accounts || [])],
+       ['categories', JSON.stringify(config.categories || [])],
+       ['budget', JSON.stringify(config.budget || null)],
+       ['recurring', JSON.stringify(config.recurring || [])],
+       ['goals', JSON.stringify(config.goals || [])],
+       ['settings', JSON.stringify(config.settings || null)],
+       ['updated_at', String(Number(data.updated_at) || Date.now())],
+       ['version', '2']
+     ];
+
+     sheet.clear();
+     sheet.getRange(1, 1, rows.length, 2).setValues(rows);
+     sheet.setColumnWidth(2, 480);
+
+     return json_({ status: 'ok', version: 2, saved: true });
+   }
+
+   function saveTransactions_(data) {
+     var sheet = getTransactionsSheet_();
      if (sheet.getLastRow() === 0) {
        sheet.appendRow(["ID", "Tanggal", "Tipe", "Kategori", "Nominal", "Dompet", "Catatan", "Sumber"]);
      }
-     var data = JSON.parse(e.postData.contents);
      var items = Array.isArray(data) ? data : [data];
      var values = sheet.getDataRange().getValues();
      var header = (values[0] || []).map(function(h) { return String(h || '').trim().toLowerCase(); });
      var hasId = header[0] === 'id';
 
-     var idRowMap = {};
-     if (hasId && values.length > 1) {
-       for (var i = 1; i < values.length; i++) {
-         var existingId = String(values[i][0] || '').trim();
-         if (existingId) idRowMap[existingId] = i + 1;
+     var deletes = [];
+     var upserts = [];
+     items.forEach(function(r) {
+       if (r && r.action === 'delete') {
+         deletes.push(String(r.id || '').trim());
+       } else if (r) {
+         upserts.push(r);
+       }
+     });
+
+     if (deletes.length > 0 && hasId && values.length > 1) {
+       var deleteSet = {};
+       deletes.forEach(function(id) { if (id) deleteSet[id] = true; });
+       for (var i = values.length - 1; i >= 1; i--) {
+         var rowId = String(values[i][0] || '').trim();
+         if (deleteSet[rowId]) {
+           sheet.deleteRow(i + 1);
+         }
+       }
+       if (upserts.length > 0) {
+         values = sheet.getDataRange().getValues();
        }
      }
 
-     items.forEach(function(r) {
+     var idRowMap = {};
+     if (hasId && values.length > 1) {
+       for (var j = 1; j < values.length; j++) {
+         var existingId = String(values[j][0] || '').trim();
+         if (existingId) idRowMap[existingId] = j + 1;
+       }
+     }
+
+     upserts.forEach(function(r) {
        var id = String(r.id || '').trim();
        var rowData = hasId
          ? [id, r.date, r.type, r.category, r.amount, r.account, r.note, r.source]
@@ -121,8 +241,7 @@ Dengan cara ini kunci tetap di server. Browser hanya memanggil `/api/ai/*`, dan 
        }
      });
 
-     return ContentService.createTextOutput(JSON.stringify({ status: 'ok', count: items.length }))
-       .setMimeType(ContentService.MimeType.JSON);
+     return json_({ status: 'ok', version: 2, count: items.length });
    }
    ```
 4. Klik **Save (Ikon Disket)**.

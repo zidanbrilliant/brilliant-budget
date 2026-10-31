@@ -5,7 +5,6 @@ import { AppIcon } from '../common/IconHelper';
 import {
   Mic,
   Camera,
-  QrCode,
   Edit3,
   ChevronRight,
   ArrowUpRight,
@@ -142,7 +141,7 @@ export const BerandaView: React.FC = () => {
 
       {/* 2. ACTION CAPSULES: Clean Fast-Entry Row */}
       <section>
-        <div className="grid grid-cols-5 gap-1.5">
+        <div className="grid grid-cols-4 gap-2">
           <button
             onClick={() => openCatat('manual')}
             className={`min-h-[64px] flex flex-col items-center justify-center py-3 px-1.5 ${
@@ -189,18 +188,6 @@ export const BerandaView: React.FC = () => {
           >
             <Camera className={`w-5 h-5 mb-1.5 ${isPinkTheme ? 'text-pink-600' : 'text-slate-700 dark:text-slate-300'}`} />
             <span className="text-[11px] font-bold">Foto Nota</span>
-          </button>
-
-          <button
-            onClick={() => openCatat('qr')}
-            className={`min-h-[64px] flex flex-col items-center justify-center py-3 px-1.5 ${
-              isPinkTheme
-                ? 'bg-white hover:border-pink-300 text-pink-900 border-pink-200/80 shadow-pink-100/20'
-                : 'bg-white dark:bg-[#151E2E] border-slate-200/70 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-emerald-500 shadow-2xs'
-            } rounded-2xl border active:scale-95 transition`}
-          >
-            <QrCode className={`w-5 h-5 mb-1.5 ${isPinkTheme ? 'text-pink-600' : 'text-slate-700 dark:text-slate-300'}`} />
-            <span className="text-[11px] font-bold">QRIS</span>
           </button>
         </div>
       </section>

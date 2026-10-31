@@ -16,7 +16,6 @@ import { Txn, TxnType } from '../../types/index.ts';
 const SOURCE_LABELS: Record<string, string> = {
   voice: 'Suara',
   ocr: 'Foto',
-  qr: 'QRIS',
   sms: 'SMS',
   notification: 'Notif',
   recurring: 'Rutin',
@@ -261,11 +260,11 @@ export const TransaksiView: React.FC = () => {
             return (
               <div key={dayKey} className="space-y-1.5">
                 {/* Section Header */}
-                <div className="flex items-center justify-between px-1 text-[11px]">
-                  <span className="font-bold text-slate-400 uppercase tracking-wider">
+                <div className="flex items-center justify-between px-1 text-[11px] gap-2">
+                  <span className="font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider truncate min-w-0">
                     {formatDateHeading(group.date.getTime())}
                   </span>
-                  <div className="font-bold tabular-nums space-x-2">
+                  <div className="font-bold tabular-nums space-x-2 shrink-0">
                     {group.subtotalExpense > 0 && (
                       <span className="text-rose-600 dark:text-rose-400">
                         -{formatIDR(group.subtotalExpense)}

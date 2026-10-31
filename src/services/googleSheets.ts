@@ -21,6 +21,7 @@ export interface SheetRowPayload {
   account: string;
   note: string;
   source: string;
+  action?: 'save' | 'delete';
 }
 
 export interface MergeResult {
@@ -99,6 +100,14 @@ export function setConfigSyncEnabled(enabled: boolean): void {
     } else {
       localStorage.removeItem(STORAGE_CONFIG_ENABLED_KEY);
     }
+  } catch {}
+}
+
+export function clearSheetSyncState(): void {
+  try {
+    localStorage.removeItem(STORAGE_QUEUE_KEY);
+    localStorage.removeItem(STORAGE_LAST_PULL_KEY);
+    localStorage.removeItem(STORAGE_CONFIG_ENABLED_KEY);
   } catch {}
 }
 
@@ -313,33 +322,58 @@ export async function syncTransactionToSheet(payload: SheetRowPayload): Promise<
   const url = getSheetWebhookUrl();
   if (!url) return;
 
-  if (!navigator.onLine) {
+  const enqueue = (item: SheetRowPayload) => {
     const queue = getQueue();
-    queue.push(payload);
+    const idx = queue.findIndex(q => q.id && q.id === item.id);
+    if (idx >= 0) {
+      queue[idx] = item;
+    } else {
+      queue.push(item);
+    }
     saveQueue(queue);
+  };
+
+  if (!navigator.onLine) {
+    enqueue(payload);
     return;
   }
 
   const success = await sendToWebhook(url, payload);
   if (!success) {
-    const queue = getQueue();
-    queue.push(payload);
-    saveQueue(queue);
+    enqueue(payload);
   }
 }
 
-export async function flushSheetQueue(): Promise<number> {
+export async function flushSheetQueue(verify = true): Promise<number> {
   const url = getSheetWebhookUrl();
   const queue = getQueue();
   if (!url || queue.length === 0 || !navigator.onLine) return 0;
 
   const count = queue.length;
   const success = await sendToWebhook(url, queue);
-  if (success) {
-    saveQueue([]);
-    return count;
+  if (!success) return 0;
+
+  if (verify) {
+    try {
+      const remote = await pullTransactionsFromSheet(url);
+      const remoteIdSet = new Set((remote || []).map(r => r.id).filter(Boolean));
+      const remaining = queue.filter(q => {
+        if (!q.id) return false;
+        if (q.action === 'delete') {
+          return remoteIdSet.has(q.id);
+        }
+        return !remoteIdSet.has(q.id);
+      });
+      saveQueue(remaining);
+      return count - remaining.length;
+    } catch (err) {
+      console.warn('Queue verification failed, retaining queue:', err);
+      return 0;
+    }
   }
-  return 0;
+
+  saveQueue([]);
+  return count;
 }
 
 function resolveCategoryId(name: string, categories: Category[]): string {
@@ -390,6 +424,7 @@ export function mergeSheetRows(
   const result: Txn[] = [...localTxns];
 
   for (const row of sheetRows) {
+    if (row.action === 'delete') continue;
     const rawAmount = Number(row.amount);
     if (!Number.isFinite(rawAmount) || rawAmount <= 0) continue;
 
@@ -404,8 +439,13 @@ export function mergeSheetRows(
     const source: TxnSource = (row.source as TxnSource) || 'import';
 
     if (rowId && localMap.has(rowId)) {
-      // Check if anything changed
       const existing = localMap.get(rowId)!;
+      // Safeguard tombstone: jangan hidupkan kembali transaksi yang sudah dihapus secara lokal
+      if (existing.deleted_at) {
+        continue;
+      }
+
+      // Check if anything changed
       if (
         existing.amount !== rawAmount ||
         existing.type !== type ||
@@ -620,15 +660,39 @@ function saveTransactions_(data) {
   var header = (values[0] || []).map(function(h) { return String(h || '').trim().toLowerCase(); });
   var hasId = header[0] === 'id';
 
-  var idRowMap = {};
-  if (hasId && values.length > 1) {
-    for (var i = 1; i < values.length; i++) {
-      var existingId = String(values[i][0] || '').trim();
-      if (existingId) idRowMap[existingId] = i + 1;
+  var deletes = [];
+  var upserts = [];
+  items.forEach(function(r) {
+    if (r && r.action === 'delete') {
+      deletes.push(String(r.id || '').trim());
+    } else if (r) {
+      upserts.push(r);
+    }
+  });
+
+  if (deletes.length > 0 && hasId && values.length > 1) {
+    var deleteSet = {};
+    deletes.forEach(function(id) { if (id) deleteSet[id] = true; });
+    for (var i = values.length - 1; i >= 1; i--) {
+      var rowId = String(values[i][0] || '').trim();
+      if (deleteSet[rowId]) {
+        sheet.deleteRow(i + 1);
+      }
+    }
+    if (upserts.length > 0) {
+      values = sheet.getDataRange().getValues();
     }
   }
 
-  items.forEach(function(r) {
+  var idRowMap = {};
+  if (hasId && values.length > 1) {
+    for (var j = 1; j < values.length; j++) {
+      var existingId = String(values[j][0] || '').trim();
+      if (existingId) idRowMap[existingId] = j + 1;
+    }
+  }
+
+  upserts.forEach(function(r) {
     var id = String(r.id || '').trim();
     var rowData = hasId
       ? [id, r.date, r.type, r.category, r.amount, r.account, r.note, r.source]

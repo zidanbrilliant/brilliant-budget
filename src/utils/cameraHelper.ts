@@ -2,13 +2,13 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 
 const UPLOAD_STATE_KEY = 'CATAT_PENDING_UPLOAD_MODE';
 
-export function savePendingUpload(mode: 'ocr' | 'qr') {
+export function savePendingUpload(mode: 'ocr') {
   try {
     sessionStorage.setItem(UPLOAD_STATE_KEY, JSON.stringify({ mode, time: Date.now() }));
   } catch {}
 }
 
-export function consumePendingUpload(): 'ocr' | 'qr' | null {
+export function consumePendingUpload(): 'ocr' | null {
   try {
     const raw = sessionStorage.getItem(UPLOAD_STATE_KEY);
     if (!raw) return null;
