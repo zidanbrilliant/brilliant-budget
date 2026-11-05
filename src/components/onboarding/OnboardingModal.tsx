@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { getSheetWebhookUrl, setSheetWebhookUrl } from '../../services/googleSheets';
+import {
+  getSheetWebhookUrl,
+  setSheetWebhookUrl,
+  pullConfigFromSheet,
+} from '../../services/googleSheets';
 import {
   ShieldCheck,
   Zap,
@@ -13,7 +17,14 @@ import {
 } from 'lucide-react';
 
 export const OnboardingModal: React.FC = () => {
-  const { settings, updateSettings, restoreConfigFromSheet, showToast } = useApp();
+  const {
+    settings,
+    updateSettings,
+    restoreConfigFromSheet,
+    saveConfigToSheet,
+    setConfigSyncEnabled,
+    showToast,
+  } = useApp();
   const [step, setStep] = useState(1);
   const [restoreUrl, setRestoreUrl] = useState(() => getSheetWebhookUrl());
   const [isRestoring, setIsRestoring] = useState(false);
@@ -25,8 +36,20 @@ export const OnboardingModal: React.FC = () => {
 
   if (settings.onboarding_completed) return null;
 
-  const handleFinish = () => {
-    if (restoreUrl.trim()) setSheetWebhookUrl(restoreUrl);
+  const handleFinish = async () => {
+    const clean = restoreUrl.trim();
+    if (clean) {
+      setSheetWebhookUrl(clean);
+      setConfigSyncEnabled(true);
+      try {
+        const pulled = await pullConfigFromSheet(clean);
+        if (pulled.version >= 2 && pulled.config) {
+          await restoreConfigFromSheet();
+        } else if (pulled.version >= 2) {
+          await saveConfigToSheet();
+        }
+      } catch {}
+    }
     updateSettings({ onboarding_completed: true });
   };
 

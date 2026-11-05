@@ -37,6 +37,8 @@ import {
   clearSheetSyncState,
   pullConfigFromSheet,
   pushConfigToSheet,
+  getLastConfigUpdatedAt,
+  setLastConfigUpdatedAt,
   type ConfigSnapshot,
   type ConfigSyncResult,
 } from '../services/googleSheets';
@@ -260,6 +262,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [hasLocalStateOnMount]);
 
+  // ===================== Config sync (dompet, kategori, budget, setelan) =====================
+  const lastConfigPushSignature = React.useRef('');
+  const configPushTimer = React.useRef<number | null>(null);
+
+  const buildConfigSnapshot = (): ConfigSnapshot => ({
+    accounts,
+    categories,
+    budget,
+    recurring,
+    goals,
+    settings,
+  });
+
+  const configSignature = (snapshot: ConfigSnapshot): string =>
+    JSON.stringify([
+      snapshot.accounts,
+      snapshot.categories,
+      snapshot.budget,
+      snapshot.recurring,
+      snapshot.goals,
+      snapshot.settings,
+    ]);
+
+  const setConfigSyncEnabled = (enabled: boolean) => {
+    setConfigSyncEnabledState(enabled);
+    persistConfigSyncEnabled(enabled);
+    if (!enabled && configPushTimer.current !== null) {
+      window.clearTimeout(configPushTimer.current);
+      configPushTimer.current = null;
+    }
+  };
+
   // Seamless 2-way Google Sheets sync
   const isSyncingFromSheet = React.useRef(false);
   const lastSheetSyncAt = React.useRef(0);
@@ -275,6 +309,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     lastSheetSyncAt.current = now;
 
     try {
+      let activeCategories = categories;
+      let activeAccounts = accounts;
+
+      if (configSyncEnabled) {
+        try {
+          const pulled = await pullConfigFromSheet(url);
+          if (pulled.version >= 2) {
+            if (pulled.config) {
+              const localUpdated = getLastConfigUpdatedAt();
+              if (pulled.updatedAt > localUpdated) {
+                const cfg = pulled.config;
+                const nextBudget = cfg.budget || budget;
+                const nextRecurring = cfg.recurring || recurring;
+                const nextGoals = cfg.goals || goals;
+                const nextSettings = cfg.settings ? { ...settings, ...cfg.settings } : settings;
+
+                lastConfigPushSignature.current = configSignature({
+                  accounts: cfg.accounts,
+                  categories: cfg.categories,
+                  budget: nextBudget,
+                  recurring: nextRecurring,
+                  goals: nextGoals,
+                  settings: nextSettings,
+                });
+
+                setAccounts(cfg.accounts);
+                setCategories(cfg.categories);
+                setBudget(nextBudget);
+                setRecurring(nextRecurring);
+                setGoals(nextGoals);
+                setSettings(nextSettings);
+                setLastConfigUpdatedAt(pulled.updatedAt);
+
+                activeCategories = cfg.categories;
+                activeAccounts = cfg.accounts;
+              }
+            } else if (!lastConfigPushSignature.current) {
+              const snapshot = buildConfigSnapshot();
+              pushConfigToSheet(url, snapshot).catch(console.error);
+            }
+          }
+        } catch (err) {
+          console.warn('Config pull error during sync:', err);
+        }
+      }
+
       const rows = await pullTransactionsFromSheet(url);
       if (!rows || rows.length === 0) return 0;
 
@@ -282,7 +362,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let updated = 0;
 
       setTransactions(prev => {
-        const res = mergeSheetRows(prev, rows, categories, accounts);
+        const res = mergeSheetRows(prev, rows, activeCategories, activeAccounts);
         added = res.addedCount;
         updated = res.updatedCount;
         if (added > 0 || updated > 0) {
@@ -315,38 +395,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return 0;
     } finally {
       isSyncingFromSheet.current = false;
-    }
-  };
-
-  // ===================== Config sync (dompet, kategori, budget, setelan) =====================
-  const lastConfigPushSignature = React.useRef('');
-  const configPushTimer = React.useRef<number | null>(null);
-
-  const buildConfigSnapshot = (): ConfigSnapshot => ({
-    accounts,
-    categories,
-    budget,
-    recurring,
-    goals,
-    settings,
-  });
-
-  const configSignature = (snapshot: ConfigSnapshot): string =>
-    JSON.stringify([
-      snapshot.accounts,
-      snapshot.categories,
-      snapshot.budget,
-      snapshot.recurring,
-      snapshot.goals,
-      snapshot.settings,
-    ]);
-
-  const setConfigSyncEnabled = (enabled: boolean) => {
-    setConfigSyncEnabledState(enabled);
-    persistConfigSyncEnabled(enabled);
-    if (!enabled && configPushTimer.current !== null) {
-      window.clearTimeout(configPushTimer.current);
-      configPushTimer.current = null;
     }
   };
 
@@ -416,6 +464,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setRecurring(nextRecurring);
     setGoals(nextGoals);
     setSettings(nextSettings);
+    setLastConfigUpdatedAt(pulled.updatedAt || Date.now());
 
     // Transaksi memakai konteks hasil restore agar nama kategori/dompet cocok.
     try {

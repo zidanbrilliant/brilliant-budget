@@ -6,6 +6,9 @@ import {
   setConfigSyncEnabled,
   pullConfigFromSheet,
   pushConfigToSheet,
+  getLastConfigUpdatedAt,
+  setLastConfigUpdatedAt,
+  clearSheetSyncState,
   GOOGLE_APPS_SCRIPT_TEMPLATE,
 } from '../src/services/googleSheets.ts';
 
@@ -265,5 +268,13 @@ const resDelete = mergeSheetRows([], rowsWithDelete, mockCategories, mockAccount
 assert.strictEqual(resDelete.addedCount, 0, 'Incoming row with action: delete must not be added');
 
 console.log('   ✓ Phase D tombstone propagation & Apps Script deletion handler terverifikasi');
+
+// Test Config Timestamp & Sync State
+assert(getLastConfigUpdatedAt() > 0, 'pushConfigToSheet must record last config updated timestamp');
+setLastConfigUpdatedAt(1700000000000);
+assert.strictEqual(getLastConfigUpdatedAt(), 1700000000000, 'Config update timestamp persisted');
+clearSheetSyncState();
+assert.strictEqual(getLastConfigUpdatedAt(), 0, 'Clear sync state resets config update timestamp');
+console.log('   ✓ Config timestamp tracking & state clearance verified');
 
 console.log('=== SEMUA PENGUJIAN GOOGLE SHEETS LULUS ===');

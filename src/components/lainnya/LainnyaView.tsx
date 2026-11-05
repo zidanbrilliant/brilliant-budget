@@ -39,6 +39,7 @@ import {
   getQueue,
   flushSheetQueue,
   sendToWebhook,
+  pullConfigFromSheet,
   GOOGLE_APPS_SCRIPT_TEMPLATE,
 } from '../../services/googleSheets';
 
@@ -121,6 +122,7 @@ export const LainnyaView: React.FC = () => {
   const [isCopiedCode, setIsCopiedCode] = useState(false);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [isRestoringConfig, setIsRestoringConfig] = useState(false);
+  const [isConnectingUrl, setIsConnectingUrl] = useState(false);
   const [configStatus, setConfigStatus] = useState<{ ok: boolean; text: string } | null>(null);
 
   // Custom Category Modal (FR-35)
@@ -265,6 +267,34 @@ export const LainnyaView: React.FC = () => {
       }
     };
     reader.readAsText(file);
+  };
+
+  const handleSaveUrl = async () => {
+    const cleanUrl = sheetUrl.trim();
+    if (!cleanUrl) {
+      showToast('URL Google Sheets tidak boleh kosong');
+      return;
+    }
+    setSheetWebhookUrl(cleanUrl);
+    setConfigSyncEnabled(true);
+    setIsConnectingUrl(true);
+    try {
+      const pulled = await pullConfigFromSheet(cleanUrl);
+      if (pulled.version >= 2 && pulled.config) {
+        await restoreConfigFromSheet();
+        showToast('Terhubung! Dompet & setelan dipulihkan dari Sheet');
+      } else if (pulled.version >= 2) {
+        await saveConfigToSheet();
+        showToast('Terhubung! Dompet & setelan disimpan ke Sheet');
+      } else {
+        showToast('URL Google Sheets disimpan');
+      }
+      await syncFromSheet(true);
+    } catch {
+      showToast('URL Google Sheets disimpan');
+    } finally {
+      setIsConnectingUrl(false);
+    }
   };
 
   const handleSaveConfig = async () => {
@@ -1129,13 +1159,18 @@ export const LainnyaView: React.FC = () => {
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setSheetWebhookUrl(sheetUrl);
-                  showToast('URL Google Sheets disimpan');
-                }}
-                className={`flex-1 min-w-[120px] py-2.5 rounded-xl font-bold transition active:scale-95 ${primaryBtn}`}
+                onClick={handleSaveUrl}
+                disabled={isConnectingUrl}
+                className={`flex-1 min-w-[120px] py-2.5 rounded-xl font-bold transition active:scale-95 disabled:opacity-50 ${primaryBtn}`}
               >
-                Simpan URL
+                {isConnectingUrl ? (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Menghubungkan...
+                  </span>
+                ) : (
+                  'Simpan URL'
+                )}
               </button>
               <button
                 type="button"

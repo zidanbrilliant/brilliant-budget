@@ -56,6 +56,7 @@ const STORAGE_URL_KEY = 'bb_gsheet_url';
 const STORAGE_QUEUE_KEY = 'bb_gsheet_queue';
 const STORAGE_LAST_PULL_KEY = 'bb_gsheet_last_pull';
 const STORAGE_CONFIG_ENABLED_KEY = 'bb_gsheet_config_enabled';
+const STORAGE_CONFIG_UPDATED_KEY = 'bb_gsheet_config_updated_at';
 
 export function getSheetWebhookUrl(): string {
   try {
@@ -108,6 +109,21 @@ export function clearSheetSyncState(): void {
     localStorage.removeItem(STORAGE_QUEUE_KEY);
     localStorage.removeItem(STORAGE_LAST_PULL_KEY);
     localStorage.removeItem(STORAGE_CONFIG_ENABLED_KEY);
+    localStorage.removeItem(STORAGE_CONFIG_UPDATED_KEY);
+  } catch {}
+}
+
+export function getLastConfigUpdatedAt(): number {
+  try {
+    return Number(localStorage.getItem(STORAGE_CONFIG_UPDATED_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function setLastConfigUpdatedAt(time: number): void {
+  try {
+    localStorage.setItem(STORAGE_CONFIG_UPDATED_KEY, String(time));
   } catch {}
 }
 
@@ -241,6 +257,7 @@ export async function pushConfigToSheet(
   }
 
   try {
+    const now = Date.now();
     // no-cors seperti sync transaksi: Apps Script mengembalikan redirect yang
     // tidak bisa dibaca browser, tetapi request tetap diproses.
     await fetch(url, {
@@ -250,9 +267,10 @@ export async function pushConfigToSheet(
       body: JSON.stringify({
         action: 'config',
         config,
-        updated_at: Date.now(),
+        updated_at: now,
       }),
     });
+    setLastConfigUpdatedAt(now);
     return { ok: true, message: 'Konfigurasi tersimpan ke Google Sheets.' };
   } catch (err) {
     console.warn('Google Sheets config push failed:', err);
