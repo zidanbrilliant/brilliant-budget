@@ -84,6 +84,7 @@ export const BudgetView: React.FC = () => {
     getMonthSummary,
     getDailyBudgetSummary,
     getCategorySpending,
+    saveDailyRemainder,
     recurring,
     addRecurring,
     updateRecurring,
@@ -150,6 +151,11 @@ export const BudgetView: React.FC = () => {
   const [selectedMethod, setSelectedMethod] = useState<BudgetMethod>(budget.method);
   const [totalLimitInput, setTotalLimitInput] = useState<number>(budget.total_limit);
   const [startDayInput, setStartDayInput] = useState<number>(budget.start_day || 1);
+  // State untuk pengaturan Jatah Harian
+  const [dailyCategoryId, setDailyCategoryId] = useState<string>(budget.daily_category_id || '');
+  const [dailySavingsAccountId, setDailySavingsAccountId] = useState<string>(budget.daily_savings_account_id || '');
+  const [dailySourceAccountId, setDailySourceAccountId] = useState<string>(budget.daily_source_account_id || '');
+  const [isSavingRemainder, setIsSavingRemainder] = useState(false);
 
   useEffect(() => {
     if (isEditingBudgetModal) {
@@ -232,6 +238,9 @@ export const BudgetView: React.FC = () => {
   const openEditBudgetModal = () => {
     setSelectedMethod(budget.method);
     setStartDayInput(budget.start_day || 1);
+    setDailyCategoryId(budget.daily_category_id || '');
+    setDailySavingsAccountId(budget.daily_savings_account_id || '');
+    setDailySourceAccountId(budget.daily_source_account_id || '');
     const lineTotal = budget.lines.reduce((sum, l) => sum + (l.amount || 0), 0);
     setTotalLimitInput(budget.total_limit || lineTotal);
 
@@ -290,6 +299,9 @@ export const BudgetView: React.FC = () => {
         start_day: Math.max(1, Math.min(31, Math.floor(startDayInput || 1))),
         total_limit: monthlyLimit,
         lines: newLines,
+        daily_category_id: dailyCategoryId || undefined,
+        daily_savings_account_id: dailySavingsAccountId || undefined,
+        daily_source_account_id: dailySourceAccountId || undefined,
       });
       showToast('Budget bulanan berhasil disimpan');
     } else {
@@ -298,6 +310,9 @@ export const BudgetView: React.FC = () => {
         method: selectedMethod,
         start_day: Math.max(1, Math.min(31, Math.floor(startDayInput || 1))),
         total_limit: Math.max(0, totalLimitInput),
+        daily_category_id: dailyCategoryId || undefined,
+        daily_savings_account_id: dailySavingsAccountId || undefined,
+        daily_source_account_id: dailySourceAccountId || undefined,
       });
       showToast('Budget bulanan berhasil disimpan');
     }
@@ -648,7 +663,14 @@ export const BudgetView: React.FC = () => {
                 <h3 className={`text-xs font-bold uppercase tracking-wider ${
                   isPinkTheme ? 'text-pink-900' : 'text-slate-800 dark:text-slate-200'
                 }`}>
-                  Jatah Harian & Proyeksi
+                  Jatah Harian
+                  {dailySummary.isCategoryMode && dailySummary.categoryLabel && (
+                    <span className={`ml-1 normal-case font-semibold ${
+                      isPinkTheme ? 'text-pink-500' : 'text-slate-400'
+                    }`}>
+                      · {dailySummary.categoryLabel}
+                    </span>
+                  )}
                 </h3>
               </div>
               <span className={`text-[11px] font-semibold ${
@@ -697,6 +719,34 @@ export const BudgetView: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Tombol Simpan Sisa Harian */}
+            {dailySummary.canSaveRemainder && budget.daily_savings_account_id && budget.daily_source_account_id && (
+              <button
+                onClick={async () => {
+                  setIsSavingRemainder(true);
+                  try {
+                    const result = saveDailyRemainder();
+                    if (result) {
+                      showToast(`Sisa ${formatCompactIDR(dailySummary.todayRemaining)} disimpan ke tabungan 🎉`);
+                    } else {
+                      showToast('Sudah disimpan hari ini atau sisa tidak mencukupi');
+                    }
+                  } finally {
+                    setIsSavingRemainder(false);
+                  }
+                }}
+                disabled={isSavingRemainder}
+                className={`w-full py-2.5 px-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all active:scale-95 ${
+                  isPinkTheme
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    : 'bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white'
+                } disabled:opacity-60`}
+              >
+                <span>💰</span>
+                {isSavingRemainder ? 'Menyimpan...' : `Simpan Sisa ${formatCompactIDR(dailySummary.todayRemaining)} ke Tabungan`}
+              </button>
+            )}
 
             {/* Proyeksi Akhir Periode Alert */}
             {totalBudget > 0 && (
@@ -1465,6 +1515,82 @@ export const BudgetView: React.FC = () => {
                   <span className="text-[11px] text-slate-400">
                     Siklus anggaran bulanan & jatah harian dihitung mulai tgl {startDayInput || 1} setiap bulan.
                   </span>
+                </div>
+              </div>
+
+              {/* Pengaturan Jatah Harian */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                <label className={labelClass}>
+                  🍽️ Pengaturan Jatah Harian
+                </label>
+
+                {/* Lacak Kategori */}
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                    Lacak Kategori
+                  </label>
+                  <select
+                    value={dailyCategoryId}
+                    onChange={e => setDailyCategoryId(e.target.value)}
+                    className={`${fieldClass} text-sm`}
+                  >
+                    <option value="">— Semua Pengeluaran —</option>
+                    {categories.filter(c => c.kind === 'expense').map(c => (
+                      <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    {dailyCategoryId
+                      ? `Jatah harian dihitung dari limit kategori "${categories.find(c => c.id === dailyCategoryId)?.name}" ÷ jumlah hari.`
+                      : 'Jatah dihitung dari total budget ÷ jumlah hari.'}
+                  </p>
+                </div>
+
+                {/* Dompet Asal (sumber sisa) */}
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                    Dompet Asal (Sumber Sisa)
+                  </label>
+                  <select
+                    value={dailySourceAccountId}
+                    onChange={e => setDailySourceAccountId(e.target.value)}
+                    className={`${fieldClass} text-sm`}
+                  >
+                    <option value="">— Tidak Simpan Sisa —</option>
+                    {accounts.map(a => (
+                      <option key={a.id} value={a.id}>{a.icon} {a.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Dompet Tujuan Tabungan */}
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                    Simpan Sisa Ke (Dompet Tabungan)
+                  </label>
+                  <select
+                    value={dailySavingsAccountId}
+                    onChange={e => setDailySavingsAccountId(e.target.value)}
+                    className={`${fieldClass} text-sm`}
+                    disabled={!dailySourceAccountId}
+                  >
+                    <option value="">— Pilih Dompet Tabungan —</option>
+                    {accounts
+                      .filter(a => a.id !== dailySourceAccountId)
+                      .map(a => (
+                        <option key={a.id} value={a.id}>{a.icon} {a.name}</option>
+                      ))}
+                  </select>
+                  {dailySourceAccountId && dailySavingsAccountId && (
+                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1">
+                      ✓ Sisa harian otomatis ditransfer ke "{accounts.find(a => a.id === dailySavingsAccountId)?.name}".
+                    </p>
+                  )}
+                  {dailySourceAccountId && !dailySavingsAccountId && (
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Pilih dompet tujuan untuk mengaktifkan simpan sisa otomatis.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

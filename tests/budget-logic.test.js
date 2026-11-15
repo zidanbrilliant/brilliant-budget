@@ -93,6 +93,8 @@ assert.strictEqual(daily.todayRemaining, 43750);
 assert.strictEqual(daily.dailyStatus, 'safe');
 assert.strictEqual(daily.projectedSpending, 3000000); // (1.5jt / 15) * 30 = 3jt
 assert.strictEqual(daily.isProjectedOverBudget, false);
+assert.strictEqual(daily.isCategoryMode, false);
+assert.strictEqual(daily.canSaveRemainder, true); // todayRemaining > 0
 
 // Test daily overspending
 const dailyOver = calculateDailyBudgetSummary({
@@ -103,6 +105,26 @@ const dailyOver = calculateDailyBudgetSummary({
 });
 assert.strictEqual(dailyOver.dailyStatus, 'exceeded');
 assert.strictEqual(dailyOver.isProjectedOverBudget, true);
+assert.strictEqual(dailyOver.canSaveRemainder, false); // todayRemaining < 0
 console.log('   ✓ calculateDailyBudgetSummary metrics, remaining & projection verified');
+
+// 7. calculateDailyBudgetSummary mode kategori
+const dailyCat = calculateDailyBudgetSummary({
+  totalBudget: 1050000, // limit kategori Makan
+  spentInPeriod: 420000, // sudah dipakai 14 hari
+  todaySpent: 28000,
+  period: p1,
+  categoryLabel: 'Makan',
+  isCategoryMode: true,
+});
+assert.strictEqual(dailyCat.dailyLimit, 35000); // 1.05jt / 30 hari
+assert.strictEqual(dailyCat.isCategoryMode, true);
+assert.strictEqual(dailyCat.categoryLabel, 'Makan');
+// remainingBudget = 1050000 - 420000 = 630000; dailyRecommended = 630000 / 16 = 39375
+assert.strictEqual(dailyCat.dailyRecommended, 39375);
+assert.strictEqual(dailyCat.todaySpent, 28000);
+assert.strictEqual(dailyCat.todayRemaining, 11375); // 39375 - 28000
+assert.strictEqual(dailyCat.canSaveRemainder, true);
+console.log('   ✓ calculateDailyBudgetSummary mode kategori (Makan) verified');
 
 console.log('=== All Budget Logic tests passed ===');

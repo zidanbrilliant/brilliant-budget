@@ -161,7 +161,7 @@ export const BerandaView: React.FC = () => {
               />
               <div className="truncate">
                 <span className={`text-[11px] font-semibold ${isPinkTheme ? 'text-pink-100/90' : 'text-slate-300'}`}>
-                  Jatah Hari Ini:{' '}
+                  Jatah Hari Ini{dailySummary.isCategoryMode && dailySummary.categoryLabel ? ` · ${dailySummary.categoryLabel}` : ''}:{' '}
                 </span>
                 <span className="text-xs font-black tabular-nums text-white">
                   {formatIDR(dailySummary.dailyRecommended)}

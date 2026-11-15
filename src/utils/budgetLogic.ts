@@ -16,6 +16,9 @@ export interface DailyBudgetInput {
   spentInPeriod: number;
   todaySpent: number;
   period: BudgetPeriod;
+  // Mode kategori (opsional)
+  categoryLabel?: string;      // nama kategori yang dilacak, untuk display
+  isCategoryMode?: boolean;    // apakah mode per-kategori aktif
 }
 
 export interface DailyBudgetSummary {
@@ -30,6 +33,10 @@ export interface DailyBudgetSummary {
   projectedSpending: number;
   isProjectedOverBudget: boolean;
   dailyStatus: 'safe' | 'warning' | 'exceeded';
+  // Info mode kategori
+  categoryLabel?: string;   // nama kategori yang dilacak
+  isCategoryMode: boolean;  // true jika mode per-kategori aktif
+  canSaveRemainder: boolean; // true jika todayRemaining > 0 (siap disimpan)
 }
 
 const MONTH_NAMES_SHORT = [
@@ -133,7 +140,14 @@ export function getBudgetPeriod(
  * and end-of-period spending projections.
  */
 export function calculateDailyBudgetSummary(input: DailyBudgetInput): DailyBudgetSummary {
-  const { totalBudget, spentInPeriod, todaySpent, period } = input;
+  const {
+    totalBudget,
+    spentInPeriod,
+    todaySpent,
+    period,
+    categoryLabel,
+    isCategoryMode = false,
+  } = input;
   const remainingBudget = Math.max(0, totalBudget - spentInPeriod);
 
   const dailyLimit = totalBudget > 0 ? Math.round(totalBudget / period.totalDays) : 0;
@@ -179,6 +193,9 @@ export function calculateDailyBudgetSummary(input: DailyBudgetInput): DailyBudge
     projectedSpending,
     isProjectedOverBudget,
     dailyStatus,
+    categoryLabel,
+    isCategoryMode,
+    canSaveRemainder: todayRemaining > 0,
   };
 }
 

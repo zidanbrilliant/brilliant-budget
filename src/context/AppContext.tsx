@@ -92,6 +92,7 @@ interface AppContextType {
   };
   getDailyBudgetSummary: () => DailyBudgetSummary;
   getCategorySpending: (categoryId: string) => number;
+  saveDailyRemainder: () => Txn | null; // Transfer sisa harian ke dompet tabungan
 
   // Actions
   addTransaction: (data: Partial<Txn>) => Txn;
@@ -754,19 +755,93 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999);
 
+    const categoryId = budget.daily_category_id;
+    const categoryLabel = categoryId
+      ? (categories.find(c => c.id === categoryId)?.name)
+      : undefined;
+    const isCategoryMode = !!categoryId;
+
+    // Budget yang dilacak: jika mode kategori, ambil limit dari budget.lines
+    // untuk kategori tersebut; jika tidak ada limit khusus, gunakan total_limit
+    let trackedBudget = budget.total_limit || 0;
+    let trackedSpentInPeriod = summary.expense;
+
+    if (isCategoryMode && categoryId) {
+      const catLine = budget.lines.find(l => l.category_id === categoryId);
+      if (catLine && catLine.amount > 0) {
+        trackedBudget = catLine.amount;
+      }
+      // Hitung pengeluaran kategori dalam periode aktif
+      trackedSpentInPeriod = transactions
+        .filter(t => {
+          if (t.deleted_at || t.status === 'draft') return false;
+          if (t.type !== 'expense') return false;
+          if (t.category_id !== categoryId) return false;
+          return t.occurred_at >= period.startDate.getTime() && t.occurred_at <= period.endDate.getTime();
+        })
+        .reduce((sum, t) => sum + t.amount, 0);
+    }
+
+    // Pengeluaran hari ini — filter per kategori jika mode aktif
     const todaySpent = transactions
       .filter(t => {
         if (t.deleted_at || t.status === 'draft') return false;
         if (t.type !== 'expense') return false;
+        if (isCategoryMode && t.category_id !== categoryId) return false;
         return t.occurred_at >= todayStart.getTime() && t.occurred_at <= todayEnd.getTime();
       })
       .reduce((sum, t) => sum + t.amount, 0);
 
     return calculateDailyBudgetSummary({
-      totalBudget: budget.total_limit || 0,
-      spentInPeriod: summary.expense,
+      totalBudget: trackedBudget,
+      spentInPeriod: trackedSpentInPeriod,
       todaySpent,
       period,
+      categoryLabel,
+      isCategoryMode,
+    });
+  };
+
+  /**
+   * Membuat transaksi Transfer dari dompet asal ke dompet tabungan
+   * sebesar sisa budget harian hari ini.
+   * Mengembalikan Txn baru, atau null jika kondisi belum terpenuhi.
+   */
+  const saveDailyRemainder = (): Txn | null => {
+    const savingsAccountId = budget.daily_savings_account_id;
+    const sourceAccountId = budget.daily_source_account_id;
+    if (!savingsAccountId || !sourceAccountId) return null;
+    if (savingsAccountId === sourceAccountId) return null;
+
+    const summary = getDailyBudgetSummary();
+    if (!summary.canSaveRemainder || summary.todayRemaining <= 0) return null;
+
+    // Cek apakah sudah ada simpan hari ini (idempotency)
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    const alreadySaved = transactions.some(
+      t =>
+        t.type === 'transfer' &&
+        t.account_id === sourceAccountId &&
+        t.to_account_id === savingsAccountId &&
+        t.note === 'Tabungan harian otomatis' &&
+        !t.deleted_at &&
+        t.occurred_at >= todayStart.getTime() &&
+        t.occurred_at <= todayEnd.getTime()
+    );
+    if (alreadySaved) return null;
+
+    return addTransaction({
+      type: 'transfer',
+      amount: Math.round(summary.todayRemaining),
+      account_id: sourceAccountId,
+      to_account_id: savingsAccountId,
+      category_id: 'cat-lainnya',
+      note: 'Tabungan harian otomatis',
+      occurred_at: Date.now(),
+      status: 'confirmed',
     });
   };
 
@@ -1142,6 +1217,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => clearInterval(timer);
   }, [accounts]);
 
+  // Auto-simpan sisa harian saat berganti hari (cek setiap menit)
+  useEffect(() => {
+    if (!budget.daily_savings_account_id || !budget.daily_source_account_id) return;
+
+    let lastCheckedDate = new Date().toDateString();
+
+    const checkAndSaveRemainder = () => {
+      const today = new Date().toDateString();
+      // Hanya jalankan saat tanggal berganti (tengah malam)
+      if (today !== lastCheckedDate) {
+        lastCheckedDate = today;
+        // Simpan sisa hari kemarin (masih dalam window 00:00)
+        // saveDailyRemainder() sudah handle idempotency via note + tanggal
+        const result = saveDailyRemainder();
+        if (result) {
+          console.info('[DailyBudget] Sisa harian otomatis disimpan:', result.amount);
+        }
+      }
+    };
+
+    const timer = setInterval(checkAndSaveRemainder, 60000); // cek tiap menit
+    return () => clearInterval(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budget.daily_savings_account_id, budget.daily_source_account_id]);
+
   // Goals actions
   const addGoal = (goal: Omit<Goal, 'id'>) => {
     const newGoal: Goal = {
@@ -1352,6 +1452,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         getMonthSummary,
         getDailyBudgetSummary,
         getCategorySpending,
+        saveDailyRemainder,
         addTransaction,
         updateTransaction,
         deleteTransaction,

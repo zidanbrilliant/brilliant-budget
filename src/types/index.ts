@@ -90,6 +90,10 @@ export interface BudgetPlan {
   is_active: boolean;
   total_limit: number;
   lines: BudgetLine[];
+  // Pengaturan Jatah Harian
+  daily_category_id?: string;        // ID kategori yang dilacak (opsional, kosong = semua pengeluaran)
+  daily_savings_account_id?: string; // ID dompet tujuan simpan sisa harian
+  daily_source_account_id?: string;  // ID dompet asal transfer sisa harian
 }
 
 export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
