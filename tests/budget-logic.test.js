@@ -3,6 +3,8 @@ import {
   calculateTotalLimitFromLines,
   cascadeDeleteCategory,
   SYSTEM_CATEGORY_ID,
+  getBudgetPeriod,
+  calculateDailyBudgetSummary,
 } from '../src/utils/budgetLogic.ts';
 
 console.log('--- Testing Budget & Category Cascade Logic ---');
@@ -53,5 +55,54 @@ assert.strictEqual(result.updatedTransactions[1].category_id, SYSTEM_CATEGORY_ID
 assert.strictEqual(result.updatedBudgetLines.length, 1);
 assert.strictEqual(result.updatedBudgetLines[0].category_id, SYSTEM_CATEGORY_ID);
 console.log('   ✓ Category cascade deletion & transaction reassignment works');
+
+// 4. getBudgetPeriod logic (start_day = 1, calendar month)
+const nov15 = new Date(2026, 10, 15); // Nov 15, 2026
+const p1 = getBudgetPeriod(1, nov15);
+assert.strictEqual(p1.totalDays, 30); // November has 30 days
+assert.strictEqual(p1.daysElapsed, 15);
+assert.strictEqual(p1.daysRemaining, 16);
+assert.strictEqual(p1.formattedRange, '1 - 30 Nov');
+console.log('   ✓ getBudgetPeriod for start_day = 1 verified');
+
+// 5. getBudgetPeriod logic (start_day = 25, mid-cycle date)
+// Today is Nov 15, so cycle is Oct 25 -> Nov 24
+const p25 = getBudgetPeriod(25, nov15);
+assert.strictEqual(p25.startDate.getMonth(), 9); // October (0-indexed 9)
+assert.strictEqual(p25.startDate.getDate(), 25);
+assert.strictEqual(p25.endDate.getMonth(), 10); // November
+assert.strictEqual(p25.endDate.getDate(), 24);
+assert.strictEqual(p25.totalDays, 31); // 7 days in Oct + 24 in Nov
+assert.strictEqual(p25.daysElapsed, 22);
+assert.strictEqual(p25.daysRemaining, 10);
+assert.strictEqual(p25.formattedRange, '25 Okt - 24 Nov');
+console.log('   ✓ getBudgetPeriod for payday start_day = 25 verified');
+
+// 6. calculateDailyBudgetSummary metrics
+const daily = calculateDailyBudgetSummary({
+  totalBudget: 3000000,
+  spentInPeriod: 1500000,
+  todaySpent: 50000,
+  period: p1, // 16 days remaining
+});
+assert.strictEqual(daily.dailyLimit, 100000); // 3jt / 30 hari
+assert.strictEqual(daily.remainingBudget, 1500000);
+assert.strictEqual(daily.dailyRecommended, 93750); // 1.5jt / 16 hari
+assert.strictEqual(daily.todaySpent, 50000);
+assert.strictEqual(daily.todayRemaining, 43750);
+assert.strictEqual(daily.dailyStatus, 'safe');
+assert.strictEqual(daily.projectedSpending, 3000000); // (1.5jt / 15) * 30 = 3jt
+assert.strictEqual(daily.isProjectedOverBudget, false);
+
+// Test daily overspending
+const dailyOver = calculateDailyBudgetSummary({
+  totalBudget: 3000000,
+  spentInPeriod: 2800000,
+  todaySpent: 120000,
+  period: p1,
+});
+assert.strictEqual(dailyOver.dailyStatus, 'exceeded');
+assert.strictEqual(dailyOver.isProjectedOverBudget, true);
+console.log('   ✓ calculateDailyBudgetSummary metrics, remaining & projection verified');
 
 console.log('=== All Budget Logic tests passed ===');

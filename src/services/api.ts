@@ -76,6 +76,8 @@ export const api = {
   getHealth: () => req<{ status: string }>('/health'),
   getAccounts: () => req<Account[]>('/accounts'),
   createAccount: (acc: Partial<Account>) => req<Account>('/accounts', { method: 'POST', body: JSON.stringify(acc) }),
+  updateAccount: (id: string, updates: Partial<Account>) =>
+    req<Account>(`/accounts/${id}`, { method: 'PUT', body: JSON.stringify(updates) }),
   deleteAccount: (id: string, reassignToId?: string) =>
     req<{ success: boolean; reassigned_to: string }>(
       `/accounts/${id}${reassignToId ? `?reassign_to=${encodeURIComponent(reassignToId)}` : ''}`,

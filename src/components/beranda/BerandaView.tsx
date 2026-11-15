@@ -26,6 +26,7 @@ export const BerandaView: React.FC = () => {
     goals,
     getAccountBalance,
     getMonthSummary,
+    getDailyBudgetSummary,
     confirmDraft,
     confirmAllDrafts,
     discardDraft,
@@ -37,6 +38,7 @@ export const BerandaView: React.FC = () => {
   const isPinkTheme = settings.theme === 'pink';
 
   const summary = getMonthSummary();
+  const dailySummary = getDailyBudgetSummary();
   const totalBudget = budget.total_limit || 0;
   const budgetSpentPercent = totalBudget > 0 ? Math.min(100, Math.round((summary.expense / totalBudget) * 100)) : 0;
   const isBudgetWarning = totalBudget > 0 && budgetSpentPercent >= 80 && budgetSpentPercent < 100;
@@ -73,7 +75,9 @@ export const BerandaView: React.FC = () => {
       }`}>
         <div className="flex items-center justify-between gap-2">
           <span className={`uppercase tracking-wider font-bold text-[11px] ${isPinkTheme ? 'text-pink-100' : 'text-slate-400'}`}>
-            {isPinkTheme ? 'Sisa Anggaran Bulan Ini ✨' : 'Sisa Anggaran Bulan Ini'}
+            {isPinkTheme
+              ? `Sisa Anggaran (${summary.period?.formattedRange || 'Bulan Ini'}) ✨`
+              : `Sisa Anggaran (${summary.period?.formattedRange || 'Bulan Ini'})`}
           </span>
           <span
             className={`px-2.5 py-1 rounded-full text-[11px] font-bold tabular-nums border shrink-0 ${
@@ -137,6 +141,56 @@ export const BerandaView: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {totalBudget > 0 && (
+          <div
+            onClick={() => setActiveTab('budget')}
+            className={`cursor-pointer mt-4 pt-3.5 border-t ${
+              isPinkTheme ? 'border-white/15' : 'border-white/10'
+            } flex items-center justify-between text-xs transition active:opacity-80`}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span
+                className={`w-2 h-2 rounded-full shrink-0 ${
+                  dailySummary.dailyStatus === 'exceeded'
+                    ? 'bg-rose-400 animate-pulse'
+                    : dailySummary.dailyStatus === 'warning'
+                    ? 'bg-amber-300'
+                    : 'bg-emerald-400'
+                }`}
+              />
+              <div className="truncate">
+                <span className={`text-[11px] font-semibold ${isPinkTheme ? 'text-pink-100/90' : 'text-slate-300'}`}>
+                  Jatah Hari Ini:{' '}
+                </span>
+                <span className="text-xs font-black tabular-nums text-white">
+                  {formatIDR(dailySummary.dailyRecommended)}
+                </span>
+                <span className={`text-[10px] ml-1.5 ${isPinkTheme ? 'text-pink-200' : 'text-slate-400'}`}>
+                  (Pakai {formatCompactIDR(dailySummary.todaySpent)})
+                </span>
+              </div>
+            </div>
+
+            <div className="text-right shrink-0">
+              <span
+                className={`text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-full border ${
+                  dailySummary.dailyStatus === 'exceeded'
+                    ? 'bg-rose-500/25 text-rose-100 border-rose-400/40'
+                    : dailySummary.dailyStatus === 'warning'
+                    ? 'bg-amber-400/20 text-amber-100 border-amber-300/40'
+                    : isPinkTheme
+                    ? 'bg-white/15 text-white border-white/20'
+                    : 'bg-emerald-400/15 text-emerald-200 border-emerald-300/30'
+                }`}
+              >
+                {dailySummary.todayRemaining >= 0
+                  ? `Sisa ${formatCompactIDR(dailySummary.todayRemaining)}`
+                  : `Over ${formatCompactIDR(Math.abs(dailySummary.todayRemaining))}`}
+              </span>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* 2. ACTION CAPSULES: Clean Fast-Entry Row */}

@@ -9,6 +9,7 @@ import {
   getLastConfigUpdatedAt,
   setLastConfigUpdatedAt,
   clearSheetSyncState,
+  formatTxnForSheetPayload,
   GOOGLE_APPS_SCRIPT_TEMPLATE,
 } from '../src/services/googleSheets.ts';
 
@@ -276,5 +277,69 @@ assert.strictEqual(getLastConfigUpdatedAt(), 1700000000000, 'Config update times
 clearSheetSyncState();
 assert.strictEqual(getLastConfigUpdatedAt(), 0, 'Clear sync state resets config update timestamp');
 console.log('   ✓ Config timestamp tracking & state clearance verified');
+
+// ================= Dompet & Transfer Syncing Tests =================
+const testTransferTxn = {
+  id: 'txn-tr-1',
+  type: 'transfer',
+  amount: 150000,
+  account_id: 'acc-bca',
+  to_account_id: 'acc-gopay',
+  occurred_at: Date.now(),
+  note: 'Topup saldo GoPay',
+  status: 'confirmed',
+  source: 'manual',
+  created_at: Date.now(),
+  updated_at: Date.now(),
+};
+
+// 1. Format transfer payload for sheet
+const payload = formatTxnForSheetPayload(testTransferTxn, mockCategories, mockAccounts);
+assert.strictEqual(payload.type, 'transfer');
+assert.strictEqual(payload.amount, 150000);
+assert.strictEqual(payload.to_account, 'GoPay Jajan');
+assert.strictEqual(payload.account, 'BCA Utama -> GoPay Jajan');
+
+// 2. Merge transfer from sheet back to local
+const transferRows = [
+  {
+    id: 'txn-tr-remote',
+    date: '2026-11-15 10:00:00',
+    type: 'transfer',
+    category: 'Transfer',
+    amount: 200000,
+    account: 'BCA -> GoPay',
+    to_account: 'GoPay',
+    note: 'Topup remote',
+    source: 'sheet',
+  },
+];
+const mergeTransferRes = mergeSheetRows([], transferRows, mockCategories, mockAccounts);
+assert.strictEqual(mergeTransferRes.addedCount, 1);
+assert.strictEqual(mergeTransferRes.merged[0].account_id, 'acc-bca');
+assert.strictEqual(mergeTransferRes.merged[0].to_account_id, 'acc-gopay');
+assert.strictEqual(mergeTransferRes.merged[0].type, 'transfer');
+console.log('   ✓ Wallet transfer synchronization & to_account resolution verified');
+
+// 3. Auto-discover new account from sheet row
+const unknownAccountRows = [
+  {
+    id: 'txn-seabank-1',
+    date: '2026-11-15 11:00:00',
+    type: 'expense',
+    category: 'Makan',
+    amount: 45000,
+    account: 'SeaBank Tabungan',
+    note: 'Makan siang',
+    source: 'sheet',
+  },
+];
+const mergeUnknownRes = mergeSheetRows([], unknownAccountRows, mockCategories, mockAccounts);
+assert.strictEqual(mergeUnknownRes.addedCount, 1);
+assert(mergeUnknownRes.newAccounts && mergeUnknownRes.newAccounts.length === 1);
+assert.strictEqual(mergeUnknownRes.newAccounts[0].name, 'SeaBank Tabungan');
+assert.strictEqual(mergeUnknownRes.newAccounts[0].type, 'bank');
+assert.strictEqual(mergeUnknownRes.merged[0].account_id, mergeUnknownRes.newAccounts[0].id);
+console.log('   ✓ Unknown wallet auto-discovery from incoming sheet verified');
 
 console.log('=== SEMUA PENGUJIAN GOOGLE SHEETS LULUS ===');

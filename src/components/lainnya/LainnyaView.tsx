@@ -48,6 +48,8 @@ export const LainnyaView: React.FC = () => {
     accounts,
     categories,
     transactions,
+    budget,
+    updateBudget,
     recurring,
     getAccountBalance,
     getTotalNetWorth,
@@ -659,6 +661,32 @@ export const LainnyaView: React.FC = () => {
               <div className="p-3.5 flex items-center justify-between">
                 <span className="font-medium text-slate-700 dark:text-slate-300">Mata Uang</span>
                 <span className="font-bold text-slate-500">IDR (Rupiah)</span>
+              </div>
+              <div className="p-3.5 flex items-center justify-between">
+                <div>
+                  <div className="font-medium text-slate-700 dark:text-slate-300">Mulai Siklus Anggaran</div>
+                  <div className="text-[11px] text-slate-400">Tanggal gajian / reset jatah budget</div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-slate-400">Tgl</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={budget.start_day || settings.start_day || 1}
+                    onChange={e => {
+                      const val = Math.max(1, Math.min(31, Number(e.target.value) || 1));
+                      updateSettings({ start_day: val });
+                      updateBudget({ ...budget, start_day: val });
+                      showToast(`Siklus anggaran diatur mulai tanggal ${val}`);
+                    }}
+                    className={`w-16 px-2 py-1 text-center font-bold text-xs rounded-lg border outline-none ${
+                      isPinkTheme
+                        ? 'border-pink-200 bg-pink-50/50 text-[#881337]'
+                        : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white'
+                    }`}
+                  />
+                </div>
               </div>
               <div className="p-3.5 flex items-center justify-between">
                 <span className="font-semibold text-rose-600">Reset Semua Data</span>

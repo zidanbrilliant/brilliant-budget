@@ -22,6 +22,10 @@ import { api } from '../services/api';
 import {
   cascadeDeleteCategory,
   SYSTEM_CATEGORY_ID,
+  getBudgetPeriod,
+  calculateDailyBudgetSummary,
+  type DailyBudgetSummary,
+  type BudgetPeriod,
 } from '../utils/budgetLogic.ts';
 import { cascadeDeleteAccount } from '../utils/accountDeletion.ts';
 import { processDueRecurringRules } from '../services/recurringScheduler';
@@ -30,6 +34,7 @@ import {
   flushSheetQueue,
   pullTransactionsFromSheet,
   mergeSheetRows,
+  formatTxnForSheetPayload,
   getSheetWebhookUrl,
   setLastPullTime,
   isConfigSyncEnabled,
@@ -78,7 +83,14 @@ interface AppContextType {
   // Calculators
   getAccountBalance: (accountId: string) => number;
   getTotalNetWorth: () => number;
-  getMonthSummary: () => { income: number; expense: number; balance: number; remainingBudget: number };
+  getMonthSummary: () => {
+    income: number;
+    expense: number;
+    balance: number;
+    remainingBudget: number;
+    period?: BudgetPeriod;
+  };
+  getDailyBudgetSummary: () => DailyBudgetSummary;
   getCategorySpending: (categoryId: string) => number;
 
   // Actions
@@ -365,6 +377,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const res = mergeSheetRows(prev, rows, activeCategories, activeAccounts);
         added = res.addedCount;
         updated = res.updatedCount;
+
+        if (res.newAccounts && res.newAccounts.length > 0) {
+          setAccounts(curr => {
+            const existingIds = new Set(curr.map(a => a.id));
+            const existingNames = new Set(curr.map(a => a.name.toLowerCase()));
+            const toAdd = res.newAccounts!.filter(
+              a => !existingIds.has(a.id) && !existingNames.has(a.name.toLowerCase())
+            );
+            if (toAdd.length === 0) return curr;
+            if (isBackendConnected) {
+              toAdd.forEach(a => api.createAccount(a).catch(console.error));
+            }
+            return [...curr, ...toAdd];
+          });
+        }
+
         if (added > 0 || updated > 0) {
           if (isBackendConnected) {
             for (const t of res.merged) {
@@ -470,9 +498,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const rows = await pullTransactionsFromSheet(url);
       if (rows.length > 0) {
-        setTransactions(prev =>
-          mergeSheetRows(prev, rows, config.categories, config.accounts).merged
-        );
+        setTransactions(prev => {
+          const res = mergeSheetRows(prev, rows, config.categories, config.accounts);
+          if (res.newAccounts && res.newAccounts.length > 0) {
+            setAccounts(curr => {
+              const existingIds = new Set(curr.map(a => a.id));
+              const existingNames = new Set(curr.map(a => a.name.toLowerCase()));
+              const toAdd = res.newAccounts!.filter(
+                a => !existingIds.has(a.id) && !existingNames.has(a.name.toLowerCase())
+              );
+              return toAdd.length > 0 ? [...curr, ...toAdd] : curr;
+            });
+          }
+          return res.merged;
+        });
       }
     } catch (err) {
       console.warn('Restore transaksi dari Sheets gagal:', err);
@@ -661,49 +700,74 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return accounts.reduce((acc, curr) => acc + getAccountBalance(curr.id), 0);
   };
 
-  // Pengeluaran per kategori bulan berjalan
+  // Pengeluaran per kategori periode berjalan (sesuai siklus budget & start_day)
   const getCategorySpending = (categoryId: string): number => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
+    const period = getBudgetPeriod(budget.start_day);
+    const startTs = period.startDate.getTime();
+    const endTs = period.endDate.getTime();
 
     return transactions
       .filter(t => {
         if (t.deleted_at || t.status === 'draft') return false;
         if (t.type !== 'expense') return false;
         if (t.category_id !== categoryId) return false;
-        const d = new Date(t.occurred_at);
-        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        return t.occurred_at >= startTs && t.occurred_at <= endTs;
       })
       .reduce((sum, t) => sum + t.amount, 0);
   };
 
-  // Ringkasan bulan berjalan
+  // Ringkasan periode berjalan (sesuai siklus budget & tanggal gajian)
   const getMonthSummary = () => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
+    const period = getBudgetPeriod(budget.start_day);
+    const startTs = period.startDate.getTime();
+    const endTs = period.endDate.getTime();
 
     let income = 0;
     let expense = 0;
 
     for (const t of transactions) {
       if (t.deleted_at || t.status === 'draft') continue;
-      const d = new Date(t.occurred_at);
-      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+      if (t.occurred_at >= startTs && t.occurred_at <= endTs) {
         if (t.type === 'income') income += t.amount;
         if (t.type === 'expense') expense += t.amount;
       }
     }
 
-    const remainingBudget = Math.max(0, budget.total_limit - expense);
+    const remainingBudget = Math.max(0, (budget.total_limit || 0) - expense);
 
     return {
       income,
       expense,
       balance: income - expense,
       remainingBudget,
+      period,
     };
+  };
+
+  // Ringkasan budget harian & proyeksi belanja akhir periode (FR-40)
+  const getDailyBudgetSummary = (): DailyBudgetSummary => {
+    const period = getBudgetPeriod(budget.start_day);
+    const summary = getMonthSummary();
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const todaySpent = transactions
+      .filter(t => {
+        if (t.deleted_at || t.status === 'draft') return false;
+        if (t.type !== 'expense') return false;
+        return t.occurred_at >= todayStart.getTime() && t.occurred_at <= todayEnd.getTime();
+      })
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    return calculateDailyBudgetSummary({
+      totalBudget: budget.total_limit || 0,
+      spentInPeriod: summary.expense,
+      todaySpent,
+      period,
+    });
   };
 
   // Transactions Actions
@@ -754,19 +818,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Async sync to Google Sheets
     if (newTxn.status === 'confirmed') {
-      const catName = categories.find(c => c.id === newTxn.category_id)?.name || 'Lainnya';
-      const accName = accounts.find(a => a.id === newTxn.account_id)?.name || 'Dompet';
-      const dateStr = new Date(newTxn.occurred_at).toLocaleString('sv-SE');
-      syncTransactionToSheet({
-        id: newTxn.id,
-        date: dateStr,
-        type: newTxn.type,
-        category: catName,
-        amount: newTxn.amount,
-        account: accName,
-        note: newTxn.merchant ? `${newTxn.merchant} ${newTxn.note ? `(${newTxn.note})` : ''}`.trim() : (newTxn.note || '-'),
-        source: newTxn.source,
-      }).catch(console.error);
+      syncTransactionToSheet(formatTxnForSheetPayload(newTxn, categories, accounts)).catch(console.error);
     }
 
     return newTxn;
@@ -786,19 +838,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const updatedTxn = { ...prevTxn, ...updates };
     if (updatedTxn.status === 'confirmed') {
-      const catName = categories.find(c => c.id === updatedTxn.category_id)?.name || 'Lainnya';
-      const accName = accounts.find(a => a.id === updatedTxn.account_id)?.name || 'Dompet';
-      const dateStr = new Date(updatedTxn.occurred_at).toLocaleString('sv-SE');
-      syncTransactionToSheet({
-        id: updatedTxn.id,
-        date: dateStr,
-        type: updatedTxn.type,
-        category: catName,
-        amount: updatedTxn.amount,
-        account: accName,
-        note: updatedTxn.merchant ? `${updatedTxn.merchant} ${updatedTxn.note ? `(${updatedTxn.note})` : ''}`.trim() : (updatedTxn.note || '-'),
-        source: updatedTxn.source,
-      }).catch(console.error);
+      syncTransactionToSheet(formatTxnForSheetPayload(updatedTxn, categories, accounts)).catch(console.error);
     }
 
     showToast('Perubahan disimpan', () => {
@@ -819,16 +859,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     if (target.status === 'confirmed') {
-      const dateStr = new Date(target.occurred_at).toLocaleString('sv-SE');
       syncTransactionToSheet({
-        id: target.id,
-        date: dateStr,
-        type: target.type,
-        category: '',
-        amount: target.amount,
-        account: '',
-        note: '',
-        source: target.source,
+        ...formatTxnForSheetPayload(target, categories, accounts),
         action: 'delete',
       }).catch(console.error);
     }
@@ -839,20 +871,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
       if (isBackendConnected) api.createTransaction(target).catch(console.error);
       if (target.status === 'confirmed') {
-        const catName = categories.find(c => c.id === target.category_id)?.name || 'Lainnya';
-        const accName = accounts.find(a => a.id === target.account_id)?.name || 'Dompet';
-        const dateStr = new Date(target.occurred_at).toLocaleString('sv-SE');
-        syncTransactionToSheet({
-          id: target.id,
-          date: dateStr,
-          type: target.type,
-          category: catName,
-          amount: target.amount,
-          account: accName,
-          note: target.merchant ? `${target.merchant} ${target.note ? `(${target.note})` : ''}`.trim() : (target.note || '-'),
-          source: target.source,
-          action: 'save',
-        }).catch(console.error);
+        syncTransactionToSheet(formatTxnForSheetPayload(target, categories, accounts, 'save')).catch(console.error);
       }
     });
   };
@@ -866,19 +885,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       api.confirmDraft(id).catch(console.error);
     }
     if (target) {
-      const catName = categories.find(c => c.id === target.category_id)?.name || 'Lainnya';
-      const accName = accounts.find(a => a.id === target.account_id)?.name || 'Dompet';
-      const dateStr = new Date(target.occurred_at).toLocaleString('sv-SE');
-      syncTransactionToSheet({
-        id: target.id,
-        date: dateStr,
-        type: target.type,
-        category: catName,
-        amount: target.amount,
-        account: accName,
-        note: target.merchant ? `${target.merchant} ${target.note ? `(${target.note})` : ''}`.trim() : (target.note || '-'),
-        source: target.source,
-      }).catch(console.error);
+      const confirmedTarget = { ...target, status: 'confirmed' as const };
+      syncTransactionToSheet(formatTxnForSheetPayload(confirmedTarget, categories, accounts)).catch(console.error);
     }
     showToast('Draft dikonfirmasi');
   };
@@ -893,19 +901,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       api.confirmAllDrafts().catch(console.error);
     }
     pendingDrafts.forEach(d => {
-      const catName = categories.find(c => c.id === d.category_id)?.name || 'Lainnya';
-      const accName = accounts.find(a => a.id === d.account_id)?.name || 'Dompet';
-      const dateStr = new Date(d.occurred_at).toLocaleString('sv-SE');
-      syncTransactionToSheet({
-        id: d.id,
-        date: dateStr,
-        type: d.type,
-        category: catName,
-        amount: d.amount,
-        account: accName,
-        note: d.merchant ? `${d.merchant} ${d.note ? `(${d.note})` : ''}`.trim() : (d.note || '-'),
-        source: d.source,
-      }).catch(console.error);
+      const confirmedD = { ...d, status: 'confirmed' as const };
+      syncTransactionToSheet(formatTxnForSheetPayload(confirmedD, categories, accounts)).catch(console.error);
     });
     showToast(`${pendingDrafts.length} draft berhasil dikonfirmasi`);
   };
@@ -1024,6 +1021,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAccounts(prev =>
       prev.map(a => (a.id === id ? { ...a, ...updates, updated_at: Date.now() } : a))
     );
+    if (isBackendConnected) {
+      api.updateAccount(id, updates).catch(console.error);
+    }
   };
 
   const deleteAccount = (id: string, reassignToId?: string) => {
@@ -1350,6 +1350,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         getAccountBalance,
         getTotalNetWorth,
         getMonthSummary,
+        getDailyBudgetSummary,
         getCategorySpending,
         addTransaction,
         updateTransaction,

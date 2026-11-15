@@ -72,6 +72,16 @@ const server = app.listen(3099, async () => {
     assert(accData.length >= 4);
     assert(typeof accData[0].balance === 'number');
 
+    // 2b. Update account
+    const updateAccRes = await fetch(`${baseUrl}/api/accounts/acc-bca`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'BCA Utama Terupdate' }),
+    });
+    assert.strictEqual(updateAccRes.status, 200);
+    const updatedAccData = await updateAccRes.json();
+    assert.strictEqual(updatedAccData.name, 'BCA Utama Terupdate');
+
     // 3. Transactions list (default 0)
     const txnRes = await fetch(`${baseUrl}/api/transactions`);
     const txnData = await txnRes.json();

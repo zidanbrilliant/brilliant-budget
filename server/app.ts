@@ -99,6 +99,41 @@ app.post('/api/accounts', (req: Request, res: Response) => {
   res.status(201).json({ id, name, type, opening_balance, icon, color, balance: opening_balance });
 });
 
+app.put('/api/accounts/:id', (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const target = db
+    .prepare('SELECT * FROM account WHERE id = ? AND deleted_at IS NULL')
+    .get(id) as any;
+
+  if (!target) {
+    return res.status(404).json({ error: 'Dompet tidak ditemukan' });
+  }
+
+  const { name, type, opening_balance, icon, color, is_archived } = req.body;
+  const nextName = name !== undefined ? name : target.name;
+  const nextType = type !== undefined ? type : target.type;
+  const nextOpening =
+    opening_balance !== undefined ? Number(opening_balance) : target.opening_balance;
+  const nextIcon = icon !== undefined ? icon : target.icon;
+  const nextColor = color !== undefined ? color : target.color;
+  const nextArchived =
+    is_archived !== undefined ? (is_archived ? 1 : 0) : target.is_archived;
+  const now = Date.now();
+
+  db.prepare(`
+    UPDATE account
+    SET name = ?, type = ?, opening_balance = ?, icon = ?, color = ?, is_archived = ?, updated_at = ?
+    WHERE id = ?
+  `).run(nextName, nextType, nextOpening, nextIcon, nextColor, nextArchived, now, id);
+
+  const updated = db.prepare('SELECT * FROM account WHERE id = ?').get(id) as any;
+  res.json({
+    ...updated,
+    is_archived: Boolean(updated.is_archived),
+    balance: calculateAccountBalance(id),
+  });
+});
+
 // Hapus dompet: pindahkan transaksi, langganan, target, dan saldo ke dompet lain.
 app.delete('/api/accounts/:id', (req: Request, res: Response) => {
   const id = String(req.params.id);

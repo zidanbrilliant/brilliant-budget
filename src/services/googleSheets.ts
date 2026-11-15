@@ -19,6 +19,7 @@ export interface SheetRowPayload {
   category: string;
   amount: number;
   account: string;
+  to_account?: string;
   note: string;
   source: string;
   action?: 'save' | 'delete';
@@ -28,6 +29,7 @@ export interface MergeResult {
   merged: Txn[];
   addedCount: number;
   updatedCount: number;
+  newAccounts?: Account[];
 }
 
 // Dompet, kategori, budget, langganan, target, dan setelan. Transaksi tetap
@@ -408,18 +410,103 @@ function resolveCategoryId(name: string, categories: Category[]): string {
   return 'cat-lainnya';
 }
 
-function resolveAccountId(name: string, accounts: Account[]): string {
-  const clean = (name || '').trim().toLowerCase();
+export function inferAccountProperties(name: string): {
+  type: Account['type'];
+  icon: string;
+  color: string;
+} {
+  const clean = (name || '').toLowerCase();
+  if (clean.includes('cash') || clean.includes('tunai') || clean.includes('dompet')) {
+    return { type: 'cash', icon: 'Banknote', color: '#16A34A' };
+  }
+  if (
+    clean.includes('gopay') ||
+    clean.includes('ovo') ||
+    clean.includes('dana') ||
+    clean.includes('shopee') ||
+    clean.includes('linkaja') ||
+    clean.includes('wallet')
+  ) {
+    return { type: 'ewallet', icon: 'Smartphone', color: '#06B6D4' };
+  }
+  if (clean.includes('kredit') || clean.includes('cc') || clean.includes('credit')) {
+    return { type: 'credit_card', icon: 'CreditCard', color: '#9333EA' };
+  }
+  return { type: 'bank', icon: 'Landmark', color: '#2563EB' };
+}
+
+export function resolveOrDiscoverAccountId(
+  name: string,
+  accounts: Account[],
+  discoveredAccounts: Account[] = []
+): string {
+  const clean = (name || '').trim();
   if (!clean) return accounts[0]?.id || 'acc-bca';
-  const exact = accounts.find(a => a.name.toLowerCase() === clean);
+
+  const lower = clean.toLowerCase();
+  const exact = accounts.find(a => a.name.toLowerCase() === lower);
   if (exact) return exact.id;
-  const byId = accounts.find(a => a.id.toLowerCase() === clean);
+  const byId = accounts.find(a => a.id.toLowerCase() === lower);
   if (byId) return byId.id;
   const partial = accounts.find(
-    a => a.name.toLowerCase().includes(clean) || clean.includes(a.name.toLowerCase())
+    a => a.name.toLowerCase().includes(lower) || lower.includes(a.name.toLowerCase())
   );
   if (partial) return partial.id;
-  return accounts[0]?.id || 'acc-bca';
+
+  const exactDisc = discoveredAccounts.find(a => a.name.toLowerCase() === lower);
+  if (exactDisc) return exactDisc.id;
+
+  // Auto-discover new account from sheet row
+  const props = inferAccountProperties(clean);
+  const slug = clean.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 15) || 'wallet';
+  const newAcc: Account = {
+    id: `acc-${slug}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    name: clean,
+    type: props.type,
+    currency: 'IDR',
+    opening_balance: 0,
+    icon: props.icon,
+    color: props.color,
+    is_archived: false,
+    created_at: Date.now(),
+    updated_at: Date.now(),
+  };
+
+  discoveredAccounts.push(newAcc);
+  accounts.push(newAcc);
+  return newAcc.id;
+}
+
+export function formatTxnForSheetPayload(
+  txn: Txn,
+  categories: Category[],
+  accounts: Account[],
+  action: 'save' | 'delete' = 'save'
+): SheetRowPayload {
+  const catName = txn.category_id
+    ? (categories.find(c => c.id === txn.category_id)?.name || 'Lainnya')
+    : (txn.type === 'transfer' ? 'Transfer' : 'Lainnya');
+  const accName = accounts.find(a => a.id === txn.account_id)?.name || 'Dompet';
+  const toAccName = txn.to_account_id
+    ? (accounts.find(a => a.id === txn.to_account_id)?.name || '')
+    : '';
+  const dateStr = new Date(txn.occurred_at).toLocaleString('sv-SE');
+  const noteStr = txn.merchant
+    ? `${txn.merchant} ${txn.note ? `(${txn.note})` : ''}`.trim()
+    : (txn.note || '-');
+
+  return {
+    id: txn.id,
+    date: dateStr,
+    type: txn.type,
+    category: action === 'delete' ? '' : catName,
+    amount: txn.amount,
+    account: action === 'delete' ? '' : (toAccName ? `${accName} -> ${toAccName}` : accName),
+    to_account: action === 'delete' ? undefined : (toAccName || undefined),
+    note: action === 'delete' ? '' : noteStr,
+    source: txn.source,
+    action,
+  };
 }
 
 export function mergeSheetRows(
@@ -440,6 +527,8 @@ export function mergeSheetRows(
   let addedCount = 0;
   let updatedCount = 0;
   const result: Txn[] = [...localTxns];
+  const discoveredAccounts: Account[] = [];
+  const currentAccounts = [...accounts];
 
   for (const row of sheetRows) {
     if (row.action === 'delete') continue;
@@ -448,13 +537,45 @@ export function mergeSheetRows(
 
     const rowId = (row.id || '').trim();
     const catId = resolveCategoryId(row.category, categories);
-    const accId = resolveAccountId(row.account, accounts);
     const parsedDate = parseDateAndTime(row.date);
     const occurredAt = Number.isFinite(parsedDate) && parsedDate > 0 ? parsedDate : Date.now();
     const type: TxnType =
       row.type === 'income' ? 'income' : row.type === 'transfer' ? 'transfer' : 'expense';
     const note = (row.note || '').trim();
     const source: TxnSource = (row.source as TxnSource) || 'import';
+
+    let accId = '';
+    let toAccId: string | undefined = undefined;
+
+    if (
+      type === 'transfer' &&
+      row.account &&
+      (row.account.includes('->') ||
+        row.account.includes('→') ||
+        row.account.toLowerCase().includes(' ke '))
+    ) {
+      const separator = row.account.includes('->')
+        ? '->'
+        : row.account.includes('→')
+        ? '→'
+        : ' ke ';
+      const parts = row.account.split(separator);
+      if (parts.length >= 2) {
+        accId = resolveOrDiscoverAccountId(parts[0].trim(), currentAccounts, discoveredAccounts);
+        toAccId = resolveOrDiscoverAccountId(
+          row.to_account || parts[1].trim(),
+          currentAccounts,
+          discoveredAccounts
+        );
+      }
+    }
+
+    if (!accId) {
+      accId = resolveOrDiscoverAccountId(row.account, currentAccounts, discoveredAccounts);
+    }
+    if (type === 'transfer' && !toAccId && row.to_account) {
+      toAccId = resolveOrDiscoverAccountId(row.to_account, currentAccounts, discoveredAccounts);
+    }
 
     if (rowId && localMap.has(rowId)) {
       const existing = localMap.get(rowId)!;
@@ -469,6 +590,7 @@ export function mergeSheetRows(
         existing.type !== type ||
         existing.category_id !== catId ||
         existing.account_id !== accId ||
+        existing.to_account_id !== toAccId ||
         existing.note !== note
       ) {
         const idx = result.findIndex(t => t.id === rowId);
@@ -479,6 +601,7 @@ export function mergeSheetRows(
             type,
             category_id: catId,
             account_id: accId,
+            to_account_id: toAccId,
             note,
             updated_at: Date.now(),
           };
@@ -500,6 +623,7 @@ export function mergeSheetRows(
       type,
       amount: rawAmount,
       account_id: accId,
+      to_account_id: toAccId,
       category_id: catId,
       note,
       status: 'confirmed',
@@ -523,6 +647,7 @@ export function mergeSheetRows(
     merged: result,
     addedCount,
     updatedCount,
+    newAccounts: discoveredAccounts.length > 0 ? discoveredAccounts : undefined,
   };
 }
 

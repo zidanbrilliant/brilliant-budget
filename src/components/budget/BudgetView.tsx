@@ -26,6 +26,7 @@ import {
   Heart,
   CalendarDays,
   CheckCircle2,
+  TrendingUp,
 } from 'lucide-react';
 import { BudgetMethod, BudgetLine, Goal, RecurringRule, TxnType } from '../../types/index.ts';
 
@@ -81,6 +82,7 @@ export const BudgetView: React.FC = () => {
     accounts,
     getAccountBalance,
     getMonthSummary,
+    getDailyBudgetSummary,
     getCategorySpending,
     recurring,
     addRecurring,
@@ -147,6 +149,7 @@ export const BudgetView: React.FC = () => {
   const [isEditingBudgetModal, setIsEditingBudgetModal] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<BudgetMethod>(budget.method);
   const [totalLimitInput, setTotalLimitInput] = useState<number>(budget.total_limit);
+  const [startDayInput, setStartDayInput] = useState<number>(budget.start_day || 1);
 
   useEffect(() => {
     if (isEditingBudgetModal) {
@@ -201,6 +204,7 @@ export const BudgetView: React.FC = () => {
 
   // Summary
   const summary = getMonthSummary();
+  const dailySummary = getDailyBudgetSummary();
   const totalBudget = budget.total_limit || 0;
   const totalSpent = summary.expense;
   const spentPercent = totalBudget > 0 ? Math.min(100, Math.round((totalSpent / totalBudget) * 100)) : 0;
@@ -227,6 +231,7 @@ export const BudgetView: React.FC = () => {
 
   const openEditBudgetModal = () => {
     setSelectedMethod(budget.method);
+    setStartDayInput(budget.start_day || 1);
     const lineTotal = budget.lines.reduce((sum, l) => sum + (l.amount || 0), 0);
     setTotalLimitInput(budget.total_limit || lineTotal);
 
@@ -282,6 +287,7 @@ export const BudgetView: React.FC = () => {
       updateBudget({
         ...budget,
         method: selectedMethod,
+        start_day: Math.max(1, Math.min(31, Math.floor(startDayInput || 1))),
         total_limit: monthlyLimit,
         lines: newLines,
       });
@@ -290,6 +296,7 @@ export const BudgetView: React.FC = () => {
       updateBudget({
         ...budget,
         method: selectedMethod,
+        start_day: Math.max(1, Math.min(31, Math.floor(startDayInput || 1))),
         total_limit: Math.max(0, totalLimitInput),
       });
       showToast('Budget bulanan berhasil disimpan');
@@ -619,6 +626,103 @@ export const BudgetView: React.FC = () => {
               <div className="flex items-center gap-1.5 text-xs text-amber-100 bg-amber-950/25 p-2 rounded-lg border border-amber-300/30">
                 <AlertTriangle className="w-4 h-4 shrink-0 text-amber-200" />
                 <span>Peringatan: Pemakaian anggaran di atas 80%.</span>
+              </div>
+            )}
+          </div>
+
+          {/* Card Jatah Budget Harian & Proyeksi (FR-40) */}
+          <div className={`p-4 rounded-2xl border shadow-xs space-y-3.5 ${
+            isPinkTheme
+              ? 'bg-white border-pink-200/80'
+              : 'bg-white dark:bg-[#151E2E] border-slate-200/80 dark:border-slate-800'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${
+                  dailySummary.dailyStatus === 'exceeded'
+                    ? 'bg-rose-500 animate-pulse'
+                    : dailySummary.dailyStatus === 'warning'
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'
+                }`} />
+                <h3 className={`text-xs font-bold uppercase tracking-wider ${
+                  isPinkTheme ? 'text-pink-900' : 'text-slate-800 dark:text-slate-200'
+                }`}>
+                  Jatah Harian & Proyeksi
+                </h3>
+              </div>
+              <span className={`text-[11px] font-semibold ${
+                isPinkTheme ? 'text-pink-600' : 'text-slate-400'
+              }`}>
+                {dailySummary.daysRemaining} hari tersisa
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className={`p-3 rounded-xl ${
+                isPinkTheme ? 'bg-pink-50/70 border border-pink-100' : 'bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800'
+              }`}>
+                <div className="text-[10px] font-medium text-slate-400">Jatah Aman Hari Ini</div>
+                <div className={`text-base font-black tabular-nums mt-0.5 ${
+                  isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'
+                }`}>
+                  {formatIDR(dailySummary.dailyRecommended)}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  dari rata-rata {formatCompactIDR(dailySummary.dailyLimit)}/hari
+                </div>
+              </div>
+
+              <div className={`p-3 rounded-xl ${
+                isPinkTheme ? 'bg-pink-50/70 border border-pink-100' : 'bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800'
+              }`}>
+                <div className="text-[10px] font-medium text-slate-400">Terpakai Hari Ini</div>
+                <div className={`text-base font-black tabular-nums mt-0.5 ${
+                  dailySummary.dailyStatus === 'exceeded'
+                    ? 'text-rose-600 dark:text-rose-400'
+                    : isPinkTheme
+                    ? 'text-rose-600'
+                    : 'text-slate-900 dark:text-white'
+                }`}>
+                  {formatIDR(dailySummary.todaySpent)}
+                </div>
+                <div className={`text-[10px] font-bold mt-0.5 tabular-nums ${
+                  dailySummary.todayRemaining >= 0
+                    ? isPinkTheme ? 'text-emerald-700' : 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-rose-600 dark:text-rose-400'
+                }`}>
+                  {dailySummary.todayRemaining >= 0
+                    ? `Sisa ${formatCompactIDR(dailySummary.todayRemaining)}`
+                    : `Over ${formatCompactIDR(Math.abs(dailySummary.todayRemaining))}`}
+                </div>
+              </div>
+            </div>
+
+            {/* Proyeksi Akhir Periode Alert */}
+            {totalBudget > 0 && (
+              <div className={`p-3 rounded-xl border text-[11px] leading-relaxed flex items-start gap-2 ${
+                dailySummary.isProjectedOverBudget
+                  ? 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-900/40 text-rose-800 dark:text-rose-200'
+                  : isPinkTheme
+                  ? 'bg-pink-50/50 border-pink-200 text-pink-800'
+                  : 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-200'
+              }`}>
+                <TrendingUp className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <span className="font-bold">
+                    Proyeksi Akhir Periode ({summary.period?.formattedRange || 'Bulan Ini'}):
+                  </span>{' '}
+                  {formatIDR(dailySummary.projectedSpending)}{' '}
+                  {dailySummary.isProjectedOverBudget ? (
+                    <span className="font-semibold text-rose-600 dark:text-rose-400">
+                      (Diproyeksikan melebihi anggaran {formatIDR(dailySummary.projectedSpending - totalBudget)} jika pola belanja berlanjut).
+                    </span>
+                  ) : (
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                      (Aman, diproyeksikan hemat {formatIDR(Math.max(0, totalBudget - dailySummary.projectedSpending))} dari anggaran).
+                    </span>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -1344,6 +1448,25 @@ export const BudgetView: React.FC = () => {
                   />
                 </div>
               )}
+
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                <label className={labelClass}>
+                  Hari Mulai Periode (Tanggal Gajian)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={startDayInput || ''}
+                    onChange={e => setStartDayInput(Math.max(1, Math.min(31, Number(e.target.value) || 1)))}
+                    className={`${fieldClass} text-sm font-bold tabular-nums w-20 shrink-0`}
+                  />
+                  <span className="text-[11px] text-slate-400">
+                    Siklus anggaran bulanan & jatah harian dihitung mulai tgl {startDayInput || 1} setiap bulan.
+                  </span>
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-2 px-5 pt-3 pb-safe-bottom shrink-0 border-t border-slate-100 dark:border-slate-800/80">
