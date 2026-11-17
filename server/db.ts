@@ -75,6 +75,13 @@ export function initDatabase() {
       start_day INTEGER DEFAULT 1,
       is_active INTEGER DEFAULT 1,
       total_limit INTEGER NOT NULL DEFAULT 5500000,
+      daily_category_id TEXT,
+      daily_savings_account_id TEXT,
+      daily_source_account_id TEXT,
+      daily_auto_save_enabled INTEGER DEFAULT 1,
+      cycle_auto_sweep INTEGER DEFAULT 0,
+      salary_category_id TEXT,
+      cycle_settled_start TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -125,7 +132,29 @@ export function initDatabase() {
     );
   `);
 
+  // CREATE TABLE IF NOT EXISTS tidak menambah kolom baru ke catat.db yang sudah ada,
+  // jadi kolom yang menyusul ditambahkan manual di sini.
+  ensureColumns('budget_plan', [
+    ['daily_category_id', 'TEXT'],
+    ['daily_savings_account_id', 'TEXT'],
+    ['daily_source_account_id', 'TEXT'],
+    ['daily_auto_save_enabled', 'INTEGER DEFAULT 1'],
+    ['cycle_auto_sweep', 'INTEGER DEFAULT 0'],
+    ['salary_category_id', 'TEXT'],
+    ['cycle_settled_start', 'TEXT'],
+  ]);
+
   seedInitialDataIfEmpty();
+}
+
+function ensureColumns(table: string, columns: Array<[string, string]>) {
+  const existing = new Set(
+    (db.prepare(`PRAGMA table_info(${table})`).all() as any[]).map(row => row.name)
+  );
+  for (const [name, declaration] of columns) {
+    if (existing.has(name)) continue;
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${declaration}`);
+  }
 }
 
 function seedInitialDataIfEmpty() {

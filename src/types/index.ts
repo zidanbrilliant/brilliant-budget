@@ -26,7 +26,7 @@ export interface Category {
 }
 
 export type TxnType = 'expense' | 'income' | 'transfer';
-export type TxnSource = 'manual' | 'voice' | 'ocr' | 'qr' | 'sms' | 'notification' | 'recurring' | 'import';
+export type TxnSource = 'manual' | 'voice' | 'ocr' | 'qr' | 'sms' | 'notification' | 'recurring' | 'import' | 'budget';
 export type TxnStatus = 'draft' | 'confirmed';
 
 export interface TxnItem {
@@ -94,6 +94,11 @@ export interface BudgetPlan {
   daily_category_id?: string;        // ID kategori yang dilacak (opsional, kosong = semua pengeluaran)
   daily_savings_account_id?: string; // ID dompet tujuan simpan sisa harian
   daily_source_account_id?: string;  // ID dompet asal transfer sisa harian
+  daily_auto_save_enabled?: boolean; // default true; false = sisa harian tidak disimpan otomatis
+  // Reset Siklus & Sisa Anggaran
+  cycle_auto_sweep?: boolean;        // default false; true = pindah sisa anggaran otomatis saat siklus berganti
+  salary_category_id?: string;       // ID kategori pemasukan gaji untuk deteksi siklus; '' = deteksi dimatikan
+  cycle_settled_start?: string;      // marker 'YYYY-MM-DD' siklus berjalan yang sudah disettle
 }
 
 export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';

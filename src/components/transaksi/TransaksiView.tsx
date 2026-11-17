@@ -20,6 +20,7 @@ const SOURCE_LABELS: Record<string, string> = {
   notification: 'Notif',
   recurring: 'Rutin',
   import: 'Impor',
+  budget: 'Budget',
 };
 
 export const TransaksiView: React.FC = () => {

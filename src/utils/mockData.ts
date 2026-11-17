@@ -86,6 +86,9 @@ export const INITIAL_BUDGET: BudgetPlan = {
     { id: 'b-line-5', category_id: 'cat-hiburan', name: 'Self Care & Me Time', amount: 0, rollover: false },
     { id: 'b-line-6', category_id: 'cat-kesehatan', name: 'Kesehatan & Skincare', amount: 0, rollover: true },
   ],
+  daily_auto_save_enabled: true,
+  cycle_auto_sweep: false,
+  salary_category_id: 'cat-gaji',
 };
 
 export const INITIAL_RECURRING: RecurringRule[] = [];

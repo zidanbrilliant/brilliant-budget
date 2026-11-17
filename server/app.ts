@@ -423,20 +423,46 @@ app.get('/api/budget', (_req: Request, res: Response) => {
   res.json({
     ...plan,
     is_active: Boolean(plan.is_active),
+    daily_auto_save_enabled: plan.daily_auto_save_enabled === null ? undefined : Boolean(plan.daily_auto_save_enabled),
+    cycle_auto_sweep: Boolean(plan.cycle_auto_sweep),
     lines: lines.map(l => ({ ...l, rollover: Boolean(l.rollover) })),
   });
 });
 
 app.put('/api/budget', (req: Request, res: Response) => {
-  const { method, total_limit, period = 'monthly', start_day = 1, lines } = req.body;
+  const {
+    method,
+    total_limit,
+    period = 'monthly',
+    start_day = 1,
+    lines,
+    daily_category_id = null,
+    daily_savings_account_id = null,
+    daily_source_account_id = null,
+    daily_auto_save_enabled = 1,
+    cycle_auto_sweep = 0,
+    salary_category_id = null,
+    cycle_settled_start = null,
+  } = req.body;
   const now = Date.now();
   let plan = db.prepare('SELECT id FROM budget_plan WHERE is_active = 1 LIMIT 1').get() as { id: string } | undefined;
   const planId = plan?.id || 'budget-active-1';
 
   db.prepare(`
-    INSERT OR REPLACE INTO budget_plan (id, method, period, start_day, is_active, total_limit, created_at, updated_at)
-    VALUES (?, ?, ?, ?, 1, ?, ?, ?)
-  `).run(planId, method, period, start_day, total_limit, now, now);
+    INSERT OR REPLACE INTO budget_plan (
+      id, method, period, start_day, is_active, total_limit,
+      daily_category_id, daily_savings_account_id, daily_source_account_id, daily_auto_save_enabled,
+      cycle_auto_sweep, salary_category_id, cycle_settled_start,
+      created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    planId, method, period, start_day, total_limit,
+    daily_category_id, daily_savings_account_id, daily_source_account_id,
+    daily_auto_save_enabled === false ? 0 : 1,
+    cycle_auto_sweep ? 1 : 0, salary_category_id, cycle_settled_start,
+    now, now
+  );
 
   if (Array.isArray(lines)) {
     db.prepare('DELETE FROM budget_line WHERE plan_id = ?').run(planId);

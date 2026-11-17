@@ -22,10 +22,17 @@ import { api } from '../services/api';
 import {
   cascadeDeleteCategory,
   SYSTEM_CATEGORY_ID,
-  getBudgetPeriod,
+  resolveBudgetCycle,
+  planCycleSettlement,
+  calculateWalletBalance,
   calculateDailyBudgetSummary,
+  withBudgetDefaults,
+  toIsoDate,
+  DAILY_SAVE_REF_PREFIX,
+  DAILY_SAVE_NOTE,
   type DailyBudgetSummary,
   type BudgetPeriod,
+  type CycleResolution,
 } from '../utils/budgetLogic.ts';
 import { cascadeDeleteAccount } from '../utils/accountDeletion.ts';
 import { processDueRecurringRules } from '../services/recurringScheduler';
@@ -93,6 +100,9 @@ interface AppContextType {
   getDailyBudgetSummary: () => DailyBudgetSummary;
   getCategorySpending: (categoryId: string) => number;
   saveDailyRemainder: () => Txn | null; // Transfer sisa harian ke dompet tabungan
+  getCycleResolution: () => CycleResolution; // Siklus aktif (tanggal gajian / hasil deteksi gaji)
+  getCycleSweepPreview: () => number;        // Sisa anggaran siklus berjalan yang siap dipindah
+  saveCycleRemainder: (mode?: 'auto' | 'manual') => Txn | null; // Pindah sisa anggaran siklus
 
   // Actions
   addTransaction: (data: Partial<Txn>) => Txn;
@@ -168,11 +178,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [budget, setBudget] = useState<BudgetPlan>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY + '_budget');
-      return saved ? JSON.parse(saved) : INITIAL_BUDGET;
+      return withBudgetDefaults(saved ? JSON.parse(saved) : INITIAL_BUDGET);
     } catch {
       return INITIAL_BUDGET;
     }
   });
+
+  // Ref mirror: dipakai penjaga siklus & aksi otomatis supaya tidak memakai state basi
+  const budgetRef = React.useRef<BudgetPlan>(budget);
+  useEffect(() => {
+    budgetRef.current = budget;
+  }, [budget]);
+
+  const accountsRef = React.useRef<Account[]>(accounts);
+  useEffect(() => {
+    accountsRef.current = accounts;
+  }, [accounts]);
 
   const [recurring, setRecurring] = useState<RecurringRule[]>(() => {
     try {
@@ -259,7 +280,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (bAccounts && bAccounts.length) setAccounts(bAccounts);
             if (bCategories && bCategories.length) setCategories(bCategories);
             if (bTxns && bTxns.length) setTransactions(bTxns);
-            if (bBudget) setBudget(bBudget);
+            if (bBudget) setBudget(withBudgetDefaults(bBudget));
             if (bRecurring) setRecurring(bRecurring);
             if (bGoals) setGoals(bGoals);
           }
@@ -333,7 +354,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               const localUpdated = getLastConfigUpdatedAt();
               if (pulled.updatedAt > localUpdated) {
                 const cfg = pulled.config;
-                const nextBudget = cfg.budget || budget;
+                const nextBudget = cfg.budget ? withBudgetDefaults(cfg.budget) : budget;
                 const nextRecurring = cfg.recurring || recurring;
                 const nextGoals = cfg.goals || goals;
                 const nextSettings = cfg.settings ? { ...settings, ...cfg.settings } : settings;
@@ -469,7 +490,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const config = pulled.config;
-    const nextBudget = config.budget || budget;
+    const nextBudget = config.budget ? withBudgetDefaults(config.budget) : budget;
     const nextRecurring = config.recurring || recurring;
     const nextGoals = config.goals || goals;
     // Gabungkan dengan setelan saat ini supaya field baru (mis. preferensi AI)
@@ -673,37 +694,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Saldo Dompet dihitung dari opening_balance + transaksi (PRD 9 & 10)
-  const getAccountBalance = (accountId: string): number => {
-    const acc = accounts.find(a => a.id === accountId);
-    if (!acc) return 0;
-    let balance = acc.opening_balance;
-
-    for (const t of transactions) {
-      if (t.deleted_at || t.status === 'draft') continue;
-      if (t.type === 'expense' && t.account_id === accountId) {
-        balance -= t.amount;
-      } else if (t.type === 'income' && t.account_id === accountId) {
-        balance += t.amount;
-      } else if (t.type === 'transfer') {
-        if (t.account_id === accountId) {
-          balance -= t.amount;
-          if (t.admin_fee) balance -= t.admin_fee;
-        }
-        if (t.to_account_id === accountId) {
-          balance += t.amount;
-        }
-      }
-    }
-    return balance;
-  };
+  const getAccountBalance = (accountId: string): number =>
+    calculateWalletBalance(
+      accounts.find(a => a.id === accountId),
+      transactions
+    );
 
   const getTotalNetWorth = (): number => {
     return accounts.reduce((acc, curr) => acc + getAccountBalance(curr.id), 0);
   };
 
-  // Pengeluaran per kategori periode berjalan (sesuai siklus budget & start_day)
+  // Pengeluaran per kategori periode berjalan (sesuai siklus budget & tanggal gajian)
   const getCategorySpending = (categoryId: string): number => {
-    const period = getBudgetPeriod(budget.start_day);
+    const period = resolveBudgetCycle(budget, transactions);
     const startTs = period.startDate.getTime();
     const endTs = period.endDate.getTime();
 
@@ -719,7 +722,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Ringkasan periode berjalan (sesuai siklus budget & tanggal gajian)
   const getMonthSummary = () => {
-    const period = getBudgetPeriod(budget.start_day);
+    const period = resolveBudgetCycle(budget, transactions);
     const startTs = period.startDate.getTime();
     const endTs = period.endDate.getTime();
 
@@ -747,7 +750,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Ringkasan budget harian & proyeksi belanja akhir periode (FR-40)
   const getDailyBudgetSummary = (): DailyBudgetSummary => {
-    const period = getBudgetPeriod(budget.start_day);
+    const period = resolveBudgetCycle(budget, transactions);
     const summary = getMonthSummary();
 
     const todayStart = new Date();
@@ -808,6 +811,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
    * Mengembalikan Txn baru, atau null jika kondisi belum terpenuhi.
    */
   const saveDailyRemainder = (): Txn | null => {
+    if (budget.daily_auto_save_enabled === false) return null;
+
     const savingsAccountId = budget.daily_savings_account_id;
     const sourceAccountId = budget.daily_source_account_id;
     if (!savingsAccountId || !sourceAccountId) return null;
@@ -821,15 +826,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999);
+    const dailyRef = DAILY_SAVE_REF_PREFIX + toIsoDate(new Date());
     const alreadySaved = transactions.some(
       t =>
         t.type === 'transfer' &&
-        t.account_id === sourceAccountId &&
-        t.to_account_id === savingsAccountId &&
-        t.note === 'Tabungan harian otomatis' &&
-        !t.deleted_at &&
-        t.occurred_at >= todayStart.getTime() &&
-        t.occurred_at <= todayEnd.getTime()
+        (t.external_ref === dailyRef || (
+          t.account_id === sourceAccountId &&
+          t.to_account_id === savingsAccountId &&
+          t.note === DAILY_SAVE_NOTE &&
+          !t.deleted_at &&
+          t.occurred_at >= todayStart.getTime() &&
+          t.occurred_at <= todayEnd.getTime()
+        ))
     );
     if (alreadySaved) return null;
 
@@ -838,11 +846,76 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       amount: Math.round(summary.todayRemaining),
       account_id: sourceAccountId,
       to_account_id: savingsAccountId,
-      category_id: 'cat-lainnya',
-      note: 'Tabungan harian otomatis',
+      category_id: SYSTEM_CATEGORY_ID,
+      note: DAILY_SAVE_NOTE,
+      external_ref: dailyRef,
       occurred_at: Date.now(),
       status: 'confirmed',
     });
+  };
+
+  // Resolusi siklus aktif (tanggal gajian + deteksi transaksi gaji)
+  const getCycleResolution = (): CycleResolution =>
+    resolveBudgetCycle(budgetRef.current, transactionsRef.current);
+
+  /** Preview sisa anggaran siklus berjalan (dipakai tombol "Pindahkan sisa sekarang"). */
+  const getCycleSweepPreview = (): number => {
+    const result = planCycleSettlement({
+      mode: 'manual',
+      budget: budgetRef.current,
+      transactions: transactionsRef.current,
+      accounts: accountsRef.current,
+    });
+    return result.ok ? result.settlement.amount : 0;
+  };
+
+  /**
+   * Memindahkan sisa anggaran ke dompet tabungan.
+   * mode 'auto'  = siklus yang baru berakhir (dipicu saat siklus berganti)
+   * mode 'manual' = siklus berjalan (dipicu tombol di halaman Budget)
+   */
+  const saveCycleRemainder = (mode: 'auto' | 'manual' = 'manual'): Txn | null => {
+    const result = planCycleSettlement({
+      mode,
+      budget: budgetRef.current,
+      transactions: transactionsRef.current,
+      accounts: accountsRef.current,
+    });
+
+    if (!result.ok) {
+      if (mode === 'manual') {
+        if (result.reason === 'already-settled') {
+          showToast('Sisa anggaran siklus ini sudah dipindahkan');
+        } else if (result.reason === 'no-wallets' || result.reason === 'same-wallet') {
+          showToast('Atur dompet asal & tujuan di Pengaturan Jatah Harian');
+        } else {
+          showToast('Tidak ada sisa anggaran untuk dipindahkan');
+        }
+      }
+      return null;
+    }
+
+    const settlement = result.settlement;
+    const txn = addTransaction({
+      type: 'transfer',
+      amount: settlement.amount,
+      account_id: settlement.sourceAccountId,
+      to_account_id: settlement.destinationAccountId,
+      category_id: SYSTEM_CATEGORY_ID,
+      note: settlement.note,
+      external_ref: settlement.externalRef,
+      occurred_at: Date.now(),
+      status: 'confirmed',
+      source: 'budget',
+    });
+
+    const destinationName =
+      accountsRef.current.find(a => a.id === settlement.destinationAccountId)?.name ||
+      'dompet tabungan';
+    showToast(
+      `Sisa anggaran Rp ${settlement.amount.toLocaleString('id-ID')} dipindahkan ke ${destinationName}`
+    );
+    return txn;
   };
 
   // Transactions Actions
@@ -1161,12 +1234,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Budget actions
-  const updateBudget = (newBudget: BudgetPlan) => {
+  const applyBudgetUpdate = (newBudget: BudgetPlan, silent = false) => {
+    budgetRef.current = newBudget;
     setBudget(newBudget);
     if (isBackendConnected) {
       api.saveBudget(newBudget).catch(console.error);
     }
-    showToast('Pengaturan budget diperbarui');
+    if (!silent) showToast('Pengaturan budget diperbarui');
+  };
+
+  const updateBudget = (newBudget: BudgetPlan) => {
+    applyBudgetUpdate(newBudget);
   };
 
   // Recurring actions
@@ -1219,6 +1297,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Auto-simpan sisa harian saat berganti hari (cek setiap menit)
   useEffect(() => {
+    if (budget.daily_auto_save_enabled === false) return;
     if (!budget.daily_savings_account_id || !budget.daily_source_account_id) return;
 
     let lastCheckedDate = new Date().toDateString();
@@ -1240,7 +1319,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const timer = setInterval(checkAndSaveRemainder, 60000); // cek tiap menit
     return () => clearInterval(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [budget.daily_savings_account_id, budget.daily_source_account_id]);
+  }, [
+    budget.daily_auto_save_enabled,
+    budget.daily_savings_account_id,
+    budget.daily_source_account_id,
+  ]);
+
+  // Penjaga siklus budget: saat siklus berganti (tanggal gajian / gaji terdeteksi),
+  // pindahkan sisa anggaran siklus sebelumnya lalu perbarui marker.
+  useEffect(() => {
+    const checkCycleBoundary = () => {
+      const config = budgetRef.current;
+      const currentStartIso = toIsoDate(
+        resolveBudgetCycle(config, transactionsRef.current).startDate
+      );
+      const settledIso = config.cycle_settled_start;
+
+      // Pertama kali: tandai siklus berjalan tanpa transfer retroaktif
+      if (!settledIso) {
+        applyBudgetUpdate({ ...config, cycle_settled_start: currentStartIso }, true);
+        return;
+      }
+
+      if (settledIso === currentStartIso) return;
+
+      // Siklus mundur (start_day/deteksi diubah): ikuti siklus berjalan tanpa transfer
+      if (settledIso > currentStartIso) {
+        applyBudgetUpdate({ ...config, cycle_settled_start: currentStartIso }, true);
+        return;
+      }
+
+      saveCycleRemainder('auto');
+      applyBudgetUpdate({ ...budgetRef.current, cycle_settled_start: currentStartIso }, true);
+    };
+
+    checkCycleBoundary();
+    const timer = setInterval(checkCycleBoundary, 60000); // cek tiap menit
+    return () => clearInterval(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    budget.start_day,
+    budget.salary_category_id,
+    budget.daily_source_account_id,
+    budget.daily_savings_account_id,
+    budget.cycle_auto_sweep,
+    isBackendConnected,
+  ]);
 
   // Goals actions
   const addGoal = (goal: Omit<Goal, 'id'>) => {
@@ -1453,6 +1577,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         getDailyBudgetSummary,
         getCategorySpending,
         saveDailyRemainder,
+        getCycleResolution,
+        getCycleSweepPreview,
+        saveCycleRemainder,
         addTransaction,
         updateTransaction,
         deleteTransaction,

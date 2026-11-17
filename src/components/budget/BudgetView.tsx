@@ -85,6 +85,9 @@ export const BudgetView: React.FC = () => {
     getDailyBudgetSummary,
     getCategorySpending,
     saveDailyRemainder,
+    getCycleResolution,
+    getCycleSweepPreview,
+    saveCycleRemainder,
     recurring,
     addRecurring,
     updateRecurring,
@@ -155,7 +158,14 @@ export const BudgetView: React.FC = () => {
   const [dailyCategoryId, setDailyCategoryId] = useState<string>(budget.daily_category_id || '');
   const [dailySavingsAccountId, setDailySavingsAccountId] = useState<string>(budget.daily_savings_account_id || '');
   const [dailySourceAccountId, setDailySourceAccountId] = useState<string>(budget.daily_source_account_id || '');
+  const [dailyAutoSaveEnabled, setDailyAutoSaveEnabled] = useState<boolean>(budget.daily_auto_save_enabled !== false);
+  // State untuk Reset Siklus & Sisa Anggaran
+  const [cycleAutoSweep, setCycleAutoSweep] = useState<boolean>(budget.cycle_auto_sweep === true);
+  const [salaryCategoryId, setSalaryCategoryId] = useState<string>(
+    budget.salary_category_id === undefined ? 'cat-gaji' : budget.salary_category_id
+  );
   const [isSavingRemainder, setIsSavingRemainder] = useState(false);
+  const [isSavingCycleRemainder, setIsSavingCycleRemainder] = useState(false);
 
   useEffect(() => {
     if (isEditingBudgetModal) {
@@ -211,6 +221,8 @@ export const BudgetView: React.FC = () => {
   // Summary
   const summary = getMonthSummary();
   const dailySummary = getDailyBudgetSummary();
+  const cycleResolution = getCycleResolution();
+  const cycleSweepPreview = getCycleSweepPreview();
   const totalBudget = budget.total_limit || 0;
   const totalSpent = summary.expense;
   const spentPercent = totalBudget > 0 ? Math.min(100, Math.round((totalSpent / totalBudget) * 100)) : 0;
@@ -241,6 +253,11 @@ export const BudgetView: React.FC = () => {
     setDailyCategoryId(budget.daily_category_id || '');
     setDailySavingsAccountId(budget.daily_savings_account_id || '');
     setDailySourceAccountId(budget.daily_source_account_id || '');
+    setDailyAutoSaveEnabled(budget.daily_auto_save_enabled !== false);
+    setCycleAutoSweep(budget.cycle_auto_sweep === true);
+    setSalaryCategoryId(
+      budget.salary_category_id === undefined ? 'cat-gaji' : budget.salary_category_id
+    );
     const lineTotal = budget.lines.reduce((sum, l) => sum + (l.amount || 0), 0);
     setTotalLimitInput(budget.total_limit || lineTotal);
 
@@ -302,6 +319,9 @@ export const BudgetView: React.FC = () => {
         daily_category_id: dailyCategoryId || undefined,
         daily_savings_account_id: dailySavingsAccountId || undefined,
         daily_source_account_id: dailySourceAccountId || undefined,
+        daily_auto_save_enabled: dailyAutoSaveEnabled,
+        cycle_auto_sweep: cycleAutoSweep,
+        salary_category_id: salaryCategoryId,
       });
       showToast('Budget bulanan berhasil disimpan');
     } else {
@@ -313,6 +333,9 @@ export const BudgetView: React.FC = () => {
         daily_category_id: dailyCategoryId || undefined,
         daily_savings_account_id: dailySavingsAccountId || undefined,
         daily_source_account_id: dailySourceAccountId || undefined,
+        daily_auto_save_enabled: dailyAutoSaveEnabled,
+        cycle_auto_sweep: cycleAutoSweep,
+        salary_category_id: salaryCategoryId,
       });
       showToast('Budget bulanan berhasil disimpan');
     }
@@ -565,6 +588,7 @@ export const BudgetView: React.FC = () => {
               <span className="uppercase tracking-wider">Budget Bulanan</span>
               <span className={`px-2 py-0.5 rounded-full ${isPinkTheme ? 'bg-white/15' : 'bg-white/10'}`}>
                 Mulai tgl {budget.start_day}
+                {cycleResolution.isSalaryDetected ? ' · dari gaji' : ''}
               </span>
             </div>
 
@@ -721,7 +745,7 @@ export const BudgetView: React.FC = () => {
             </div>
 
             {/* Tombol Simpan Sisa Harian */}
-            {dailySummary.canSaveRemainder && budget.daily_savings_account_id && budget.daily_source_account_id && (
+            {budget.daily_auto_save_enabled !== false && dailySummary.canSaveRemainder && budget.daily_savings_account_id && budget.daily_source_account_id && (
               <button
                 onClick={async () => {
                   setIsSavingRemainder(true);
@@ -776,6 +800,70 @@ export const BudgetView: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Card Sisa Anggaran Siklus (reset mengikuti tanggal gajian) */}
+          {budget.daily_source_account_id && budget.daily_savings_account_id && (
+            <div className={`p-4 rounded-2xl border shadow-xs space-y-3 ${
+              isPinkTheme
+                ? 'bg-white border-pink-200/80'
+                : 'bg-white dark:bg-[#151E2E] border-slate-200/80 dark:border-slate-800'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Repeat className={`w-3.5 h-3.5 ${isPinkTheme ? 'text-pink-500' : 'text-emerald-600'}`} />
+                  <h3 className={`text-xs font-bold uppercase tracking-wider ${
+                    isPinkTheme ? 'text-pink-900' : 'text-slate-800 dark:text-slate-200'
+                  }`}>
+                    Sisa Anggaran Siklus
+                  </h3>
+                </div>
+                <span className={`text-[11px] font-semibold ${
+                  isPinkTheme ? 'text-pink-600' : 'text-slate-400'
+                }`}>
+                  {budget.cycle_auto_sweep ? 'Otomatis aktif' : 'Manual'}
+                </span>
+              </div>
+
+              <div className={`p-3 rounded-xl ${
+                isPinkTheme
+                  ? 'bg-pink-50/70 border border-pink-100'
+                  : 'bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800'
+              }`}>
+                <div className="text-[10px] font-medium text-slate-400">
+                  Sisa siap dipindah · siklus {cycleResolution.formattedRange}
+                </div>
+                <div className={`text-base font-black tabular-nums mt-0.5 ${
+                  isPinkTheme ? 'text-[#881337]' : 'text-slate-900 dark:text-white'
+                }`}>
+                  {formatIDR(cycleSweepPreview)}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                  Tujuan: {accounts.find(a => a.id === budget.daily_savings_account_id)?.name || '-'}
+                  {cycleResolution.isSalaryDetected ? ' · siklus digeser dari transaksi gaji' : ''}
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setIsSavingCycleRemainder(true);
+                  try {
+                    saveCycleRemainder('manual');
+                  } finally {
+                    setIsSavingCycleRemainder(false);
+                  }
+                }}
+                disabled={isSavingCycleRemainder || cycleSweepPreview <= 0}
+                className={`w-full py-2.5 px-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 ${
+                  isPinkTheme
+                    ? 'bg-rose-500 hover:bg-rose-600 text-white'
+                    : 'bg-[#0F172A] dark:bg-emerald-700 hover:dark:bg-emerald-600 text-white'
+                }`}
+              >
+                <span>🔄</span>
+                {isSavingCycleRemainder ? 'Memindahkan...' : 'Pindahkan Sisa Sekarang'}
+              </button>
+            </div>
+          )}
 
           {categoryAllocated > availableForCategories && (
             <div className={`flex items-start gap-2 p-3 rounded-xl border text-[11px] ${
@@ -1589,6 +1677,77 @@ export const BudgetView: React.FC = () => {
                   {dailySourceAccountId && !dailySavingsAccountId && (
                     <p className="text-[10px] text-slate-400 mt-1">
                       Pilih dompet tujuan untuk mengaktifkan simpan sisa otomatis.
+                    </p>
+                  )}
+                </div>
+
+                {/* Aktifkan simpan sisa harian otomatis */}
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={dailyAutoSaveEnabled}
+                    onChange={e => setDailyAutoSaveEnabled(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0"
+                  />
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Simpan sisa harian otomatis setiap tengah malam (matikan bila hanya ingin
+                    memindahkan sisa di akhir siklus).
+                  </span>
+                </label>
+              </div>
+
+              {/* Reset Siklus & Sisa Anggaran */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                <label className={labelClass}>
+                  🔄 Reset Siklus & Sisa Anggaran
+                </label>
+
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={cycleAutoSweep}
+                    onChange={e => setCycleAutoSweep(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0"
+                  />
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Pindahkan sisa anggaran otomatis saat siklus berganti (total budget −
+                    pengeluaran siklus yang berakhir, maksimal saldo dompet asal).
+                  </span>
+                </label>
+
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                    Kategori Gaji (Deteksi Otomatis)
+                  </label>
+                  <select
+                    value={salaryCategoryId}
+                    onChange={e => setSalaryCategoryId(e.target.value)}
+                    className={`${fieldClass} text-sm`}
+                  >
+                    <option value="">— Nonaktifkan Deteksi Gaji —</option>
+                    {categories.filter(c => c.kind === 'income').map(c => (
+                      <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    {salaryCategoryId
+                      ? `Siklus dimulai dari tanggal transaksi gaji bila dicatat dalam ±7 hari dari tanggal gajian (tgl ${startDayInput || 1}). Kalau tidak ada, siklus tetap mulai tgl ${startDayInput || 1}.`
+                      : 'Deteksi gaji dimatikan: siklus selalu mulai sesuai tanggal gajian di atas.'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase block mb-1">
+                    Dompet Asal & Tujuan Sisa Siklus
+                  </label>
+                  {dailySourceAccountId && dailySavingsAccountId ? (
+                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                      ✓ Mengikuti setelan Jatah Harian: "{accounts.find(a => a.id === dailySourceAccountId)?.name}" → "{accounts.find(a => a.id === dailySavingsAccountId)?.name}".
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                      Atur "Dompet Asal (Sumber Sisa)" & "Simpan Sisa Ke" di Pengaturan Jatah Harian
+                      di atas untuk mengaktifkan.
                     </p>
                   )}
                 </div>
