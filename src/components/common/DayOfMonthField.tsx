@@ -14,6 +14,8 @@ interface DayOfMonthFieldProps {
   ariaLabel: string;
   isPinkTheme: boolean;
   error?: string;
+  allowClear?: boolean;
+  previewLabel?: string;
 }
 
 interface PopoverPosition {
@@ -30,6 +32,8 @@ export const DayOfMonthField: React.FC<DayOfMonthFieldProps> = ({
   ariaLabel,
   isPinkTheme,
   error,
+  allowClear = true,
+  previewLabel = 'Jatuh tempo berikutnya',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState<PopoverPosition | null>(null);
@@ -240,7 +244,7 @@ export const DayOfMonthField: React.FC<DayOfMonthFieldProps> = ({
             {value === null ? 'Pilih tanggal' : `Tgl ${value}`}
           </span>
         </button>
-        {value !== null && (
+        {allowClear && value !== null && (
           <button
             type="button"
             onClick={clearDay}
@@ -326,7 +330,7 @@ export const DayOfMonthField: React.FC<DayOfMonthFieldProps> = ({
 
             <div className={`mt-3 rounded-xl border px-2.5 py-2 ${previewTone}`}>
               <div className={`text-[9px] font-bold uppercase tracking-wider ${mutedTone}`}>
-                Jatuh tempo berikutnya
+                {previewLabel}
               </div>
               <div className={`text-[11px] font-bold mt-0.5 ${titleTone}`}>
                 {value === null ? 'Pilih tanggal dulu' : formatNextRun(getNextRunForDay(value))}
@@ -344,7 +348,7 @@ export const DayOfMonthField: React.FC<DayOfMonthFieldProps> = ({
               >
                 Hari ini (tgl {today})
               </button>
-              {value !== null && (
+              {allowClear && value !== null && (
                 <button
                   type="button"
                   onClick={clearDay}

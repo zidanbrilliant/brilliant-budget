@@ -1591,19 +1591,20 @@ export const BudgetView: React.FC = () => {
                 <label className={labelClass}>
                   Hari Mulai Periode (Tanggal Gajian)
                 </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
-                    value={startDayInput || ''}
-                    onChange={e => setStartDayInput(Math.max(1, Math.min(31, Number(e.target.value) || 1)))}
-                    className={`${fieldClass} text-sm font-bold tabular-nums w-20 shrink-0`}
-                  />
-                  <span className="text-[11px] text-slate-400">
-                    Siklus anggaran bulanan & jatah harian dihitung mulai tgl {startDayInput || 1} setiap bulan.
-                  </span>
-                </div>
+                <DayOfMonthField
+                  value={startDayInput || 1}
+                  onChange={day => {
+                    if (day !== null) setStartDayInput(day);
+                  }}
+                  ariaLabel="Tanggal gajian"
+                  isPinkTheme={isPinkTheme}
+                  allowClear={false}
+                  previewLabel="Gajian berikutnya"
+                />
+                <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                  Siklus anggaran bulanan & jatah harian dihitung mulai tanggal{' '}
+                  <span className="font-bold tabular-nums">{startDayInput || 1}</span> setiap bulan.
+                </p>
               </div>
 
               {/* Pengaturan Jatah Harian */}

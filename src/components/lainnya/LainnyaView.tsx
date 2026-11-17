@@ -5,6 +5,7 @@ import { formatIDR, formatCompactIDR } from '../../utils/formatters';
 import { AppIcon } from '../common/IconHelper';
 import { ReportPieChart } from '../common/ReportPieChart';
 import { GeminiKeyPanel } from '../common/GeminiKeyPanel';
+import { DayOfMonthField } from '../common/DayOfMonthField';
 import { buildReportSummary, type ReportPeriodMode } from '../../utils/reporting';
 import {
   CreditCard,
@@ -662,31 +663,28 @@ export const LainnyaView: React.FC = () => {
                 <span className="font-medium text-slate-700 dark:text-slate-300">Mata Uang</span>
                 <span className="font-bold text-slate-500">IDR (Rupiah)</span>
               </div>
-              <div className="p-3.5 flex items-center justify-between">
-                <div>
-                  <div className="font-medium text-slate-700 dark:text-slate-300">Mulai Siklus Anggaran</div>
-                  <div className="text-[11px] text-slate-400">Tanggal gajian / reset jatah budget</div>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs text-slate-400">Tgl</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
+              <div className="p-3.5">
+                <div className="font-medium text-slate-700 dark:text-slate-300">Mulai Siklus Anggaran</div>
+                <div className="text-[11px] text-slate-400">Tanggal gajian / reset jatah budget</div>
+                <div className="mt-2">
+                  <DayOfMonthField
                     value={budget.start_day || settings.start_day || 1}
-                    onChange={e => {
-                      const val = Math.max(1, Math.min(31, Number(e.target.value) || 1));
-                      updateSettings({ start_day: val });
-                      updateBudget({ ...budget, start_day: val });
-                      showToast(`Siklus anggaran diatur mulai tanggal ${val}`);
+                    onChange={day => {
+                      if (day === null) return;
+                      updateSettings({ start_day: day });
+                      updateBudget({ ...budget, start_day: day });
+                      showToast(`Siklus anggaran diatur mulai tanggal ${day}`);
                     }}
-                    className={`w-16 px-2 py-1 text-center font-bold text-xs rounded-lg border outline-none ${
-                      isPinkTheme
-                        ? 'border-pink-200 bg-pink-50/50 text-[#881337]'
-                        : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white'
-                    }`}
+                    ariaLabel="Tanggal gajian"
+                    isPinkTheme={isPinkTheme}
+                    allowClear={false}
+                    previewLabel="Gajian berikutnya"
                   />
                 </div>
+                <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                  Siklus anggaran bulanan dimulai tanggal{' '}
+                  <span className="font-bold tabular-nums">{budget.start_day || settings.start_day || 1}</span> setiap bulan.
+                </p>
               </div>
               <div className="p-3.5 flex items-center justify-between">
                 <span className="font-semibold text-rose-600">Reset Semua Data</span>
