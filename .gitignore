@@ -38,3 +38,7 @@ Thumbs.db
 
 # Test artifacts
 .e2e/
+
+# Tool metadata
+.commandcode/
+
